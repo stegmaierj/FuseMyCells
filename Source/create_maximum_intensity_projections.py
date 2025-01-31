@@ -15,27 +15,30 @@ from skimage import io, filters
 
 def main(hparams):
     
-    input_folder = hparams.input_folder
-    output_folder = hparams.output_folder
+    input_file = hparams.input_file
+    output_path = hparams.output_path
+    output_path_xy = output_path + 'XY/'
+    output_path_xz = output_path + 'XZ/'
+    output_path_yz = output_path + 'YZ/'
 
-    if not isdir(output_folder):
-        mkdir(output_folder)
+    if not isdir(output_path_xy):
+        mkdir(output_path_xy)
 
-    input_files = [f for f in listdir(input_folder) if isfile(join(input_folder, f))]
+    if not isdir(output_path_xz):
+        mkdir(output_path_xz)
 
-    for input_image_file in input_files:
+    if not isdir(output_path_yz):
+        mkdir(output_path_yz)
 
-        current_file = input_folder + input_image_file
+    input_image = io.imread(input_file)
+    projection_x, projection_y, projection_z = create_maximum_intensity_projections(input_image)
 
-        input_image = io.imread(current_file)
-        projection_x, projection_y, projection_z = create_maximum_intensity_projections(input_image)
+    io.imsave(output_path_xy + input_file.replace('.tif', '_MaxProjXY.tif'), projection_x)
+    io.imsave(output_path_xz + input_file.replace('.tif', '_MaxProjXZ.tif'), projection_y)
+    io.imsave(output_path_yz + input_file.replace('.tif', '_MaxProjYZ.tif'), projection_z)
 
-        io.imsave(output_folder + input_image_file.replace('.tif', '_MaxProjXY.tif'), projection_x)
-        io.imsave(output_folder + input_image_file.replace('.tif', '_MaxProjXZ.tif'), projection_y)
-        io.imsave(output_folder + input_image_file.replace('.tif', '_MaxProjYZ.tif'), projection_z)
-
-        print(input_image_file)
-        test = 1
+    print(input_file)
+    test = 1
    
 
 if __name__ == '__main__':
@@ -47,13 +50,6 @@ if __name__ == '__main__':
     parent_parser = ArgumentParser(add_help=False)
 
     parent_parser.add_argument(
-        '--input_folder',
-        type=str,
-        default=r'/Users/jstegmaier/Downloads/Study3/',
-        help='Directory of raw images'
-    )
-
-    parent_parser.add_argument(
         '--input_file',
         type=str,
         default=r'/Users/jstegmaier/Downloads/Study3/Study1/image_91_nucleus_angle.tif',
@@ -61,7 +57,7 @@ if __name__ == '__main__':
     )
     
     parent_parser.add_argument(
-        '--output_folder',
+        '--output_path',
         type=str,
         default=r'path/to/output/images',
         help='Output directory'
