@@ -11,86 +11,52 @@ from scipy.ndimage import zoom, distance_transform_edt
 
 import matplotlib.pyplot as plt
 
+from os import listdir, mkdir
+from os.path import isfile, join, isdir
+
 from PIL import Image
 from PIL.TiffTags import TAGS
 
-from fmc_utils import get_fmc_metadata, compute_convex_image, get_fmc_gradient_info, get_fmc_light_direction
+from utils.fmc_utils import get_fmc_metadata, compute_convex_image, get_fmc_gradient_info, get_fmc_light_direction
+from utils.h5_converter import prepare_image_fmc
+from argparse import ArgumentParser
 
-
-
-selected_series = 1
-
-#input_image_file = '/Users/jstegmaier/Downloads/Study3/Study1/image_100_membrane_angle.tif'
-#input_image_file = '/Users/jstegmaier/Downloads/Study3/Study2/image_120_nucleus_angle.tif'
-#input_image_file = '/Users/jstegmaier/Downloads/Study3/Study3/image_192_membrane_angle.tif'
-input_image_file = '/Users/jstegmaier/Downloads/Study3/Study4/image_305_nucleus_fused.tif'
-#input_image_file = '/Users/jstegmaier/Downloads/Study3/Study5/image_394_nucleus_angle.tif'
-
-output_image_file_edt = input_image_file.replace('.tif', '_edt.tif')
-output_image_file_lmi = input_image_file.replace('.tif', '_lmi.tif')
-
-
-meta_data = get_fmc_metadata(input_image_file)
+def main(hparams):
     
+    input_file = hparams.input_file
+    output_path = hparams.output_path
 
-current_study = int(meta_data['study'])
-gradient_z, gradient_y, gradient_x = get_fmc_gradient_info(current_study)
+    if not isdir(output_path):
+        mkdir(output_path)
+
+    prepare_image_fmc(input_file, output_path=output_path, identifier='*.tif', descriptor='', normalize=[1,99],\
+                   get_surfacedistance=True, get_lightmap=True, get_normalized_intensity=True)
+
+if __name__ == '__main__':
+    # ------------------------
+    # TRAINING ARGUMENTS
+    # ------------------------
+    # these are project-wide arguments
+
+    parent_parser = ArgumentParser(add_help=False)
+
+    parent_parser.add_argument(
+        '--input_file',
+        type=str,
+        default=r'/Users/jstegmaier/Downloads/Study3/Study1/image_91_nucleus_angle.tif',
+        help='A single input file'
+    )
     
+    parent_parser.add_argument(
+        '--output_path',
+        type=str,
+        default=r'path/to/output/images',
+        help='Output directory'
+    )    
+        
+    hyperparams = parent_parser.parse_args()
 
-input_image = io.imread(input_image_file)
-
-
-slopes = get_fmc_light_direction(input_image, debug_figures=False)
-
-original_size = input_image.shape
-
-
-image_spacing = [float(meta_data['physical_size_z']), float(meta_data['physical_size_y']), float(meta_data['physical_size_x'])]
-
-input_image = zoom(input_image, (image_spacing[0], image_spacing[1], image_spacing[2]))
-
-## create the light distance image
-light_map_image = np.ones_like(input_image)
-
-#gradient_z = False
-#gradient_y = False
-#gradient_x = True
-
-#slopes[0] = -1
-#slopes[1] = -1
-#slopes[2] = -1
-
-if gradient_z and slopes[0] > 0:
-    light_map_image[0, ...] = 0
-elif gradient_z and slopes[0] < 0:
-    light_map_image[-1, ...] = 0
-
-if gradient_y and slopes[1] > 0:
-    light_map_image[:, 0, :] = 0
-elif gradient_y and slopes[1] < 0:
-    light_map_image[:, -1, :] = 0
-
-if gradient_x and slopes[2] > 0:
-    light_map_image[:, :, 0] = 0
-elif gradient_x and slopes[2] < 0:
-    light_map_image[:, :, -1] = 0
-
-light_map_image = distance_transform_edt(light_map_image)
-io.imsave(output_image_file_lmi, light_map_image.astype(np.uint16))
-
-downsampled_size = input_image.shape
-upsampling_factors = np.array(original_size) / np.array(downsampled_size)
-
-convex_image = compute_convex_image(input_image, image_spacing)
-
-edt_image = distance_transform_edt(convex_image)
-
-edt_image = zoom(edt_image.astype(np.uint16), (upsampling_factors[0], upsampling_factors[1], upsampling_factors[2]))
-
-io.imsave(output_image_file_edt, edt_image)
-
-
-
-
-
-#find_light_direction(input_image)
+    # ---------------------
+    # RUN TRAINING
+    # ---------------------
+    main(hyperparams)
