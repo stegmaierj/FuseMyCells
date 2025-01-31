@@ -21,6 +21,9 @@ def main(hparams):
     output_path_xz = output_path + 'XZ/'
     output_path_yz = output_path + 'YZ/'
 
+    if not isdir(output_path):
+        mkdir(output_path)
+
     if not isdir(output_path_xy):
         mkdir(output_path_xy)
 
