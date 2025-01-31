@@ -212,11 +212,31 @@ def foreground_from_mip(img):
         
 
 def prepare_image_fmc(input_path, output_path=None, identifier='*.tif', descriptor='', normalize=[0,100],\
-                   get_surfacedistance=False, get_lightmap=False, get_normalized_intensity=False):
+                   get_surfacedistance=False, get_lightmap=False, get_normalized_intensity=False, overwrite=False):
     
     meta_data = get_fmc_metadata(input_path)
-    current_study = int(meta_data['study'])
+
+    current_study = 0
+    if 'study' in meta_data.keys():
+        current_study = int(meta_data['study'])
+    else:
+        current_study = 4
+        print('Meta information for study not found for current file! Setting it hard-coded to 4!')
+
     image_spacing = [float(meta_data['physical_size_z']), float(meta_data['physical_size_y']), float(meta_data['physical_size_x'])]
+
+    # save the data
+    head, tail = os.path.split(input_path)
+    save_name = ''
+    if (output_path == None):
+        save_name = input_path.replace('.tif', '.h5')
+    else:
+        if not isdir(output_path):
+            mkdir(output_path)
+        save_name = output_path + tail.replace('.tif', '.h5')
+
+    if isfile(save_name) and not overwrite:
+        return
 
     # load the image
     input_image = io.imread(input_path)
@@ -225,8 +245,6 @@ def prepare_image_fmc(input_path, output_path=None, identifier='*.tif', descript
     original_size = input_image.shape
     downsampled_size = small_input_image.shape
     upsampling_factors = np.array(original_size) / np.array(downsampled_size)
-
-
 
     # save raw image
     save_imgs = [input_image,]
@@ -290,15 +308,5 @@ def prepare_image_fmc(input_path, output_path=None, identifier='*.tif', descript
         
         save_imgs.append(input_image.astype(np.float32))
         save_groups.append('normalized_intensity')
-    
-    # save the data
-    head, tail = os.path.split(input_path)
-    save_name = ''
-    if (output_path == None):
-        save_name = input_path.replace('.tif', '.h5')
-    else:
-        if not isdir(output_path):
-            mkdir(output_path)
-        save_name = output_path + tail.replace('.tif', '.h5')    
 
     h5_writer(save_imgs, save_name, group_root='data', group_names=save_groups)
