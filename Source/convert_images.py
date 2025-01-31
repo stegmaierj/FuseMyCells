@@ -29,8 +29,12 @@ def main(hparams):
     if not isdir(output_path):
         mkdir(output_path)
 
-    prepare_image_fmc(input_file, output_path=output_path, identifier='*.tif', descriptor='', normalize=[1,99],\
-                   get_surfacedistance=True, get_lightmap=True, get_normalized_intensity=True)
+    if "_fused" not in input_file:
+        prepare_image_fmc(input_file, output_path=output_path, identifier='*.tif', descriptor='', normalize=[1,99],\
+                       get_surfacedistance=True, get_lightmap=True, get_normalized_intensity=True)
+    else:
+        prepare_image_fmc(input_file, output_path=output_path, identifier='*.tif', descriptor='', normalize=[1,99],\
+                       get_surfacedistance=False, get_lightmap=False, get_normalized_intensity=False)
 
 if __name__ == '__main__':
     # ------------------------
