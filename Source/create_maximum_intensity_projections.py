@@ -34,6 +34,7 @@ def main(hparams):
         io.imsave(output_folder + input_image_file.replace('.tif', '_MaxProjXZ.tif'), projection_y)
         io.imsave(output_folder + input_image_file.replace('.tif', '_MaxProjYZ.tif'), projection_z)
 
+        print(input_image_file)
         test = 1
    
 
