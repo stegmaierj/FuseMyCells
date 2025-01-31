@@ -8,7 +8,7 @@ Created on Fri Jan 31
 
 from argparse import ArgumentParser
 from os import listdir, mkdir
-from os.path import isfile, join, isdir
+from os.path import isfile, join, isdir, split
 from utils.fmc_utils import create_maximum_intensity_projections
 from skimage import io, filters
 
@@ -36,9 +36,11 @@ def main(hparams):
     input_image = io.imread(input_file)
     projection_x, projection_y, projection_z = create_maximum_intensity_projections(input_image)
 
-    io.imsave(output_path_xy + input_file.replace('.tif', '_MaxProjXY.tif'), projection_x)
-    io.imsave(output_path_xz + input_file.replace('.tif', '_MaxProjXZ.tif'), projection_y)
-    io.imsave(output_path_yz + input_file.replace('.tif', '_MaxProjYZ.tif'), projection_z)
+    head, tail = split(input_file)
+
+    io.imsave(output_path_xy + tail.replace('.tif', '_MaxProjXY.tif'), projection_x)
+    io.imsave(output_path_xz + tail.replace('.tif', '_MaxProjXZ.tif'), projection_y)
+    io.imsave(output_path_yz + tail.replace('.tif', '_MaxProjYZ.tif'), projection_z)
 
     print(input_file)
     test = 1
