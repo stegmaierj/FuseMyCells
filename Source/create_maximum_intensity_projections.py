@@ -9,7 +9,7 @@ Created on Fri Jan 31
 from argparse import ArgumentParser
 from os import listdir, mkdir
 from os.path import isfile, join, isdir
-from fmc_utils import create_maximum_intensity_projections
+from utils.fmc_utils import create_maximum_intensity_projections
 from skimage import io, filters
 
 
