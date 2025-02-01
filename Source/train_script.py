@@ -103,14 +103,14 @@ if __name__ == '__main__':
     parent_parser.add_argument(
         '--output_path',
         type=str,
-        default=r'/work/scratch/eschweiler/results/DiffusionModel3D_test',
+        default=r'/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Processing/',
         help='output path for test results'
     )
     
     parent_parser.add_argument(
         '--log_path',
         type=str,
-        default=r'/Users/jstegmaier/Downloads/Processing/logs',
+        default=r'/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Logs/',
         help='output path for test results'
     )
     

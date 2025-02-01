@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 import pytorch_lightning as pl
+from torchmetrics.image import StructuralSimilarityIndexMeasure
 
 from argparse import ArgumentParser, Namespace
 from collections import OrderedDict
@@ -109,6 +110,15 @@ class ImageFusionUNet3D(pl.LightningModule):
         self.predictions = self.forward(self.last_imgs)
                         
         # get the losses
+        ssim = StructuralSimilarityIndexMeasure(data_range=None)
+        ssim.cuda()
+
+        loss = ssim(self.predictions, self.last_masks)
+
+
+        self.logger.experiment.add_scalar('ssim', loss, self.current_epoch)
+
+        """
         loss_bg = self.background_loss(self.predictions[:,0,...], self.last_masks[:,0,...])
         loss_seed = self.seed_loss(self.predictions[:,1,...], self.last_masks[:,1,...])
         loss_boundary = self.boundary_loss(self.predictions[:,2,...], self.last_masks[:,2,...])
@@ -117,9 +127,10 @@ class ImageFusionUNet3D(pl.LightningModule):
                self.hparams.seed_weight * loss_seed + \
                self.hparams.boundary_weight * loss_boundary
         
-        self.logger.experiment.add_scalar('bg_loss', loss_bg, self.current_epoch) 
+        self.logger.experiment.add_scalar('bg_loss', loss_bg, self.current_epoch)
         self.logger.experiment.add_scalar('seed_loss', loss_seed, self.current_epoch) 
-        self.logger.experiment.add_scalar('boundary_loss', loss_boundary, self.current_epoch) 
+        self.logger.experiment.add_scalar('boundary_loss', loss_boundary, self.current_epoch)
+        """
         
         return loss
         
@@ -212,10 +223,10 @@ class ImageFusionUNet3D(pl.LightningModule):
 
         # data
         parser.add_argument('--data_norm', default='none', type=str)        
-        parser.add_argument('--data_root', default=r'/Users/jstegmaier/Downloads/Study3/Study1_H5/', type=str) 
-        parser.add_argument('--train_list', default=r'/Users/jstegmaier/Programming/Projects/FuseMyCellsISBI_ImageFusion/Source/data/study1_train.csv', type=str)
-        parser.add_argument('--test_list', default=r'/Users/jstegmaier/Programming/Projects/FuseMyCellsISBI_ImageFusion/Source/data/study1_train.csv', type=str)
-        parser.add_argument('--val_list', default=r'/Users/jstegmaier/Programming/Projects/FuseMyCellsISBI_ImageFusion/Source/data/study1_train.csv', type=str)
+        parser.add_argument('--data_root', default=r'/netshares/BiomedicalImageAnalysis/Resources/FuseMyCells_ISBIChallenge/Data/', type=str) 
+        parser.add_argument('--train_list', default=r'/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Source/data/Study1_Train.csv', type=str)
+        parser.add_argument('--test_list', default=r'/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Source/data/Study1_Train.csv', type=str)
+        parser.add_argument('--val_list', default=r'/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Source/data/Study1_Train.csv', type=str)
         parser.add_argument('--image_groups', default=('data/raw_image', 'data/normalized_intensity', 'data/surface_distance', 'data/light_map'), type=str, nargs='+')
         parser.add_argument('--mask_groups', default=('data/raw_image',), type=str, nargs='+')
         parser.add_argument('--dist_handling', default='bool_inv', type=str)
