@@ -43,7 +43,8 @@ def main(hparams):
     # 1 INIT LIGHTNING MODEL
     # ------------------------
     model = network(hparams=hparams)
-    model = model.load_from_checkpoint(hparams.ckpt_path)
+    #model = model.load_from_checkpoint(hparams.ckpt_path)
+    model.load_pretrained(pretrained_file=hparams.ckpt_path)
     model = model.cuda()
     
     # ------------------------
@@ -167,14 +168,14 @@ if __name__ == '__main__':
     parent_parser.add_argument(
         '--output_path',
         type=str,
-        default=r'/work/scratch/eschweiler/results/aae100_test',
+        default=r'/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Processing/ApplyTest',
         help='output path for test results'
     )
     
     parent_parser.add_argument(
         '--ckpt_path',
         type=str,
-        default=r'/work/scratch/eschweiler/results/aae100_test/Autoencoder3D_adversarial-epoch=002-step=444.ckpt',
+        default=r'/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Processing/Study1_Membrane_1_1/imagefusionunet3d-epoch=291-step=16936.ckpt',
         help='output path for test results'
     )
     
@@ -241,7 +242,7 @@ if __name__ == '__main__':
         '--pipeline',
         type=str,
         default='Autoencoder3D_adversarial',
-        help='which pipeline to load (MulticlassSeg3D | Cellpose3D | Cellpose3D_sampling | Cellpose3D_samplingAug | SynthGAN3D | SynthGAN3D_noise | SynthGAN3D_sampling | Autoencoder3D | Mapping3D)'
+        help='which pipeline to load (MulticlassSeg3D | Cellpose3D | Cellpose3D_sampling | Cellpose3D_samplingAug | SynthGAN3D | SynthGAN3D_noise | SynthGAN3D_sampling | ImageFusionUNet3D | Autoencoder3D | Mapping3D)'
     )
         
     parent_args = parent_parser.parse_known_args()[0]
@@ -265,6 +266,8 @@ if __name__ == '__main__':
         from models.Autoencoder3D import Autoencoder3D as network
     elif parent_args.pipeline.lower() == 'autoencoder3d_adversarial':
         from models.Autoencoder3D_adversarial import Autoencoder3D_adversarial as network
+    elif parent_args.pipeline.lower() == 'imagefusionunet3d':
+        from models.ImageFusionUNet3D import ImageFusionUNet3D as network
     elif parent_args.pipeline.lower() == 'mapping3d':
         from models.Mapping3D import Mapping3D as network
     else:

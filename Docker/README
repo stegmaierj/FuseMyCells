@@ -1,0 +1,16 @@
+The following is a simple example algorithm.
+
+It is meant to run within a container.
+
+To run it locally, you can call the following bash script:
+
+bash test_run.sh
+
+This will start the inference and reads from ./test/input and outputs to ./test/output
+
+To export the container and prep it for upload to Grand-Challenge.org you can call:
+
+  docker save example-algorithm-phase-1 | gzip -c > example-algorithm-phase-1.tar.gz
+
+Any container that shows the same behavior will do, this is purely an example of how one COULD do it.
+

@@ -28,6 +28,7 @@ class ImageFusionUNet3D(pl.LightningModule):
             hparams = Namespace(**hparams)
         self.save_hyperparameters(hparams)
         self.augmentation_dict = {}
+        self.ssim_weight = hparams.ssim_weight
 
         # load the backbone network architecture
         if self.hparams.backbone.lower() == 'unet3d':        
@@ -110,13 +111,17 @@ class ImageFusionUNet3D(pl.LightningModule):
         self.predictions = self.forward(self.last_imgs)
                         
         # get the losses
-        ssim = StructuralSimilarityIndexMeasure(data_range=None)
+        ssim = StructuralSimilarityIndexMeasure(data_range=1.0)
         ssim.cuda()
 
-        loss = ssim(self.predictions, self.last_masks)
+        loss_ssim = self.ssim_weight * (1.0 - ssim(self.predictions, self.last_masks))
+        loss_l1 = F.l1_loss(self.predictions, self.last_masks)
 
+        loss = loss_ssim + loss_l1
 
-        self.logger.experiment.add_scalar('ssim', loss, self.current_epoch)
+        self.logger.experiment.add_scalar('ssim', loss_ssim, self.current_epoch)
+        self.logger.experiment.add_scalar('l1', loss_l1, self.current_epoch)
+        self.logger.experiment.add_scalar('loss', loss, self.current_epoch)
 
         """
         loss_bg = self.background_loss(self.predictions[:,0,...], self.last_masks[:,0,...])
@@ -137,22 +142,46 @@ class ImageFusionUNet3D(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         x, y = batch['image'], batch['mask']
         y_hat = self.forward(x)
-        return {'test_loss': F.l1_loss(y_hat, y)} 
+
+        ssim = StructuralSimilarityIndexMeasure(data_range=1.0)
+        ssim.cuda()
+
+        test_loss_ssim = self.ssim_weight * (1.0 - ssim(y_hat, y))
+        test_loss_l1 = F.l1_loss(y_hat, y)
+
+        test_loss = test_loss_ssim + test_loss_l1
+
+        return {'test_loss_ssim': test_loss_ssim, 'test_loss_l1': test_loss_l1, 'test_loss': test_loss}
 
     def test_end(self, outputs):
         avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
-        tensorboard_logs = {'test_loss': avg_loss}
-        return {'avg_test_loss': avg_loss, 'log': tensorboard_logs}
+        avg_loss_ssim = torch.stack([x['test_loss_ssim'] for x in outputs]).mean()
+        avg_loss_l1 = torch.stack([x['test_loss_l1'] for x in outputs]).mean()
+
+        tensorboard_logs = {'test_loss': avg_loss, 'test_loss_l1': avg_loss_l1, 'test_loss_ssim': avg_loss_ssim}
+        return {'avg_test_loss': avg_loss, 'avg_test_loss_l1': avg_loss_l1, 'avg_test_loss_ssim': avg_loss_ssim, 'log': tensorboard_logs}
     
     def validation_step(self, batch, batch_idx):
         x, y = batch['image'], batch['mask']
         y_hat = self.forward(x)
-        return {'val_loss': F.mse_loss(y_hat, y)} 
+
+        ssim = StructuralSimilarityIndexMeasure(data_range=1.0)
+        ssim.cuda()
+
+        val_loss_ssim = self.ssim_weight * (1.0 - ssim(y_hat, y))
+        val_loss_l1 = F.l1_loss(y_hat, y)
+
+        val_loss = val_loss_ssim + val_loss_l1
+
+        return {'val_loss_ssim': val_loss_ssim, 'val_loss_l1': val_loss_l1, 'val_loss': val_loss}
 
     def validation_end(self, outputs):
         avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        tensorboard_logs = {'val_loss': avg_loss}
-        return {'avg_val_loss': avg_loss, 'log': tensorboard_logs}
+        avg_loss_ssim = torch.stack([x['val_loss_ssim'] for x in outputs]).mean()
+        avg_loss_l1 = torch.stack([x['val_loss_l1'] for x in outputs]).mean()
+
+        tensorboard_logs = {'val_loss': avg_loss, 'val_loss_l1': avg_loss_l1, 'val_loss_ssim': avg_loss_ssim}
+        return {'avg_val_loss': avg_loss, 'avg_val_loss_l1': avg_loss_l1, 'avg_val_loss_ssim': avg_loss_ssim, 'log': tensorboard_logs}
 
     def configure_optimizers(self):
         opt = torch.optim.RAdam(self.network.parameters(), lr=self.hparams.learning_rate)
@@ -164,7 +193,7 @@ class ImageFusionUNet3D(pl.LightningModule):
          else:
             dataset = MeristemH5Dataset(self.hparams.train_list, self.hparams.data_root, patch_size=self.hparams.patch_size,\
                                         image_groups=self.hparams.image_groups, mask_groups=self.hparams.mask_groups, augmentation_dict=self.augmentation_dict,\
-                                        dist_handling=self.hparams.dist_handling, seed_handling='float', data_norm=self.hparams.data_norm, samples_per_epoch=self.hparams.samples_per_epoch)
+                                        dist_handling=self.hparams.dist_handling, seed_handling='float', data_norm=self.hparams.data_norm, samples_per_epoch=self.hparams.samples_per_epoch, binary_mask=False, patches_from_fg=0.75)
             return DataLoader(dataset, batch_size=self.hparams.batch_size, shuffle=True, drop_last=True)
     
     def test_dataloader(self):
@@ -173,7 +202,7 @@ class ImageFusionUNet3D(pl.LightningModule):
         else:
             dataset = MeristemH5Dataset(self.hparams.test_list, self.hparams.data_root, patch_size=self.hparams.patch_size,\
                                         image_groups=self.hparams.image_groups, mask_groups=self.hparams.mask_groups, augmentation_dict={},\
-                                        dist_handling=self.hparams.dist_handling, seed_handling='float', data_norm=self.hparams.data_norm)
+                                        dist_handling=self.hparams.dist_handling, seed_handling='float', data_norm=self.hparams.data_norm, binary_mask=False, patches_from_fg=0.75)
             return DataLoader(dataset, batch_size=self.hparams.batch_size)
     
     def val_dataloader(self):
@@ -182,7 +211,7 @@ class ImageFusionUNet3D(pl.LightningModule):
         else:
             dataset = MeristemH5Dataset(self.hparams.val_list, self.hparams.data_root, patch_size=self.hparams.patch_size,\
                                         image_groups=self.hparams.image_groups, mask_groups=self.hparams.mask_groups, augmentation_dict={},\
-                                        dist_handling=self.hparams.dist_handling, seed_handling='float', data_norm=self.hparams.data_norm)
+                                        dist_handling=self.hparams.dist_handling, seed_handling='float', data_norm=self.hparams.data_norm, binary_mask=False, patches_from_fg=0.75)
             return DataLoader(dataset, batch_size=self.hparams.batch_size)
 
 
@@ -190,13 +219,26 @@ class ImageFusionUNet3D(pl.LightningModule):
         
         # log sampled images
         predictions = self.forward(self.last_imgs)
-        prediction_grid = torchvision.utils.make_grid(predictions[:,:,int(self.hparams.patch_size[0]//2),:,:])
+
+        selected_prediction = predictions[:,:,int(self.hparams.patch_size[0]//2),:,:]
+        selected_prediction = (selected_prediction - torch.min(selected_prediction[:])) / (torch.max(selected_prediction[:]) - torch.min(selected_prediction[:]))
+        selected_prediction = torch.clip(selected_prediction, torch.tensor(0.0).cuda(), torch.tensor(1.0).cuda())
+
+        prediction_grid = torchvision.utils.make_grid(selected_prediction)
         self.logger.experiment.add_image('generated_images', prediction_grid, self.current_epoch)
+
+        selected_raw_image = self.last_imgs[:,0,int(self.hparams.patch_size[0]//2),:,:]
+        selected_raw_image = (selected_raw_image - torch.min(selected_raw_image[:])) / (torch.max(selected_raw_image[:]) - torch.min(selected_raw_image[:]))
+        selected_raw_image = torch.clip(selected_raw_image, torch.tensor(0.0).cuda(), torch.tensor(1.0).cuda())
         
-        img_grid = torchvision.utils.make_grid(self.last_imgs[:,:,int(self.hparams.patch_size[0]//2),:,:])
+        img_grid = torchvision.utils.make_grid(selected_raw_image)
         self.logger.experiment.add_image('raw_images', img_grid, self.current_epoch)
+
+        selected_target_image = self.last_masks[:,:,int(self.hparams.patch_size[0]//2),:,:]
+        selected_target_image = (selected_target_image - torch.min(selected_target_image[:])) / (torch.max(selected_target_image[:]) - torch.min(selected_target_image[:]))
+        selected_target_image = torch.clip(selected_target_image, torch.tensor(0.0).cuda(), torch.tensor(1.0).cuda())
         
-        mask_grid = torchvision.utils.make_grid(self.last_masks[:,:,int(self.hparams.patch_size[0]//2),:,:])
+        mask_grid = torchvision.utils.make_grid(selected_target_image)
         self.logger.experiment.add_image('target_masks', mask_grid, self.current_epoch)
         
         
@@ -218,15 +260,15 @@ class ImageFusionUNet3D(pl.LightningModule):
         parser.add_argument('--out_channels', default=1, type=int)
         parser.add_argument('--feat_channels', default=16, type=int)
         parser.add_argument('--patch_size', default=(64,128,128), type=int, nargs='+')
-        parser.add_argument('--out_activation', default='sigmoid', type=str)
+        parser.add_argument('--out_activation', default='none', type=str)
         parser.add_argument('--layer_norm', default='instance', type=str)
 
         # data
-        parser.add_argument('--data_norm', default='none', type=str)        
+        parser.add_argument('--data_norm', default='fmc_percentile', type=str)        
         parser.add_argument('--data_root', default=r'/netshares/BiomedicalImageAnalysis/Resources/FuseMyCells_ISBIChallenge/Data/', type=str) 
-        parser.add_argument('--train_list', default=r'/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Source/data/Study1_Train.csv', type=str)
-        parser.add_argument('--test_list', default=r'/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Source/data/Study1_Train.csv', type=str)
-        parser.add_argument('--val_list', default=r'/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Source/data/Study1_Train.csv', type=str)
+        parser.add_argument('--train_list', default=r'/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Source/data/Study1_train.csv', type=str)
+        parser.add_argument('--test_list', default=r'/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Source/data/Study1_test.csv', type=str)
+        parser.add_argument('--val_list', default=r'/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Source/data/Study1_val.csv', type=str)
         parser.add_argument('--image_groups', default=('data/raw_image', 'data/normalized_intensity', 'data/surface_distance', 'data/light_map'), type=str, nargs='+')
         parser.add_argument('--mask_groups', default=('data/raw_image',), type=str, nargs='+')
         parser.add_argument('--dist_handling', default='bool_inv', type=str)
@@ -238,5 +280,6 @@ class ImageFusionUNet3D(pl.LightningModule):
         parser.add_argument('--background_weight', default=1, type=float)
         parser.add_argument('--seed_weight', default=100, type=float)
         parser.add_argument('--boundary_weight', default=1, type=float)
+        parser.add_argument('--ssim_weight', default=100, type=float)
         
         return parser

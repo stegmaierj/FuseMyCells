@@ -20,7 +20,7 @@ class MeristemH5Dataset(Dataset):
     """
     
     def __init__(self, list_path, data_root='', patch_size=(64,128,128), data_norm='percentile', shuffle=True, samples_per_epoch=-1,\
-                 image_groups=('data/image',), mask_groups=('data/distance', 'data/seeds', 'data/boundary'), patches_from_fg=0.0,\
+                 image_groups=('data/image',), mask_groups=('data/distance', 'data/seeds', 'data/boundary'), patches_from_fg=0.0, binary_mask=True,\
                  image_noise_channel=-2, mask_noise_channel=-2, noise_type='gaussian',\
                  dist_handling='bool', dist_scaling=(100,100), seed_handling='float', boundary_handling='bool', instance_handling='bool',\
                  correspondence=True, no_img=False, no_mask=False, reduce_dim=False, augmentation_dict=None, **kwargs):
@@ -38,6 +38,7 @@ class MeristemH5Dataset(Dataset):
         self.patch_size = tuple(patch_size)
         self.data_norm = data_norm
         self.patches_from_fg = patches_from_fg
+        self.binary_mask = binary_mask
         self.dist_handling = dist_handling
         self.dist_scaling = dist_scaling
         self.seed_handling = seed_handling
@@ -247,7 +248,10 @@ class MeristemH5Dataset(Dataset):
                         
                         # obtain patch position from foreground indices or random
                         if self.patches_from_fg > np.random.random():
-                            fg_indices = np.where(mask_tmp)
+                            if self.binary_mask == True:
+                                fg_indices = np.where(mask_tmp)
+                            else:
+                                fg_indices = np.where(mask_tmp >= np.mean(mask_tmp))
                             rnd_start = [np.maximum(0,f[np.random.randint(len(fg_indices[0]))]-p) for f,p in zip(fg_indices,patch_size)]
                         else:
                             rnd_start = [np.random.randint(0, np.maximum(1,mask_dim-patch_dim)) for patch_dim, mask_dim in zip(patch_size, mask_tmp.shape)]

@@ -17,6 +17,8 @@ from scipy.spatial import ConvexHull, Delaunay
 from utils.utils import print_timestamp
 from utils.fmc_utils import get_fmc_gradient_info, get_fmc_light_direction, get_fmc_metadata, compute_convex_image
 
+import SimpleITK as sitk
+
 
 
 def h5_writer(data_list, save_path, group_root='data', group_names=['image']):
@@ -211,8 +213,75 @@ def foreground_from_mip(img):
     return mip
         
 
+def fmc_percentile_normalization(image, pmin=2, pmax=99.8, axis=None):
+    """
+    Compute a percentile normalization for the given image.
+    Parameters:
+    - image (array): array (2D or 3D) of the image file.
+    - pmin  (int or float): the minimal percentage for the percentiles to compute.
+                            Values must be between 0 and 100 inclusive.
+    - pmax  (int or float): the maximal percentage for the percentiles to compute.
+                            Values must be between 0 and 100 inclusive.
+    - axis : Axis or axes along which the percentiles are computed.
+             The default (=None) is to compute it along a flattened version of the array.
+    - dtype (dtype): type of the wanted percentiles (uint16 by default)
+
+    Returns:
+    Normalized image (np.ndarray): An array containing the normalized image.
+    """
+
+    if not (np.isscalar(pmin) and np.isscalar(pmax) and 0 <= pmin < pmax <= 100 ):
+        raise ValueError("Invalid values for pmin and pmax")
+
+    low_percentile = np.percentile(image, pmin, axis = axis, keepdims = True)
+    high_percentile = np.percentile(image, pmax, axis = axis, keepdims = True)
+
+    if low_percentile == high_percentile:
+        print(f"Same min {low_percentile} and high {high_percentile}, image may be empty")
+        return image
+
+    return (image - low_percentile) / (high_percentile - low_percentile)
+
+def resample_image_itk(input_image, image_spacing=[1.0, 1.0, 1.0], resize_factor=1.0):
+   
+    original_CT = sitk.GetImageFromArray(input_image)
+    original_CT.SetSpacing(image_spacing)
+
+    dimension = original_CT.GetDimension()
+    reference_physical_size = np.zeros(original_CT.GetDimension())
+    reference_physical_size[:] = [(sz-1)*spc if sz*spc>mx  else mx for sz,spc,mx in zip(original_CT.GetSize(), original_CT.GetSpacing(), reference_physical_size)]
+    
+    reference_origin = original_CT.GetOrigin()
+    reference_direction = original_CT.GetDirection()
+
+    reference_size = [round(sz/resize_factor) for sz in original_CT.GetSize()] 
+    reference_spacing = [ phys_sz/(sz-1) for sz,phys_sz in zip(reference_size, reference_physical_size) ]
+
+    reference_image = sitk.Image(reference_size, original_CT.GetPixelIDValue())
+    reference_image.SetOrigin(reference_origin)
+    reference_image.SetSpacing(reference_spacing)
+    reference_image.SetDirection(reference_direction)
+
+    reference_center = np.array(reference_image.TransformContinuousIndexToPhysicalPoint(np.array(reference_image.GetSize())/2.0))
+    
+    transform = sitk.AffineTransform(dimension)
+    transform.SetMatrix(original_CT.GetDirection())
+
+    transform.SetTranslation(np.array(original_CT.GetOrigin()) - reference_origin)
+  
+    centering_transform = sitk.TranslationTransform(dimension)
+    img_center = np.array(original_CT.TransformContinuousIndexToPhysicalPoint(np.array(original_CT.GetSize())/2.0))
+    centering_transform.SetOffset(np.array(transform.GetInverse().TransformPoint(img_center) - reference_center))
+    centered_transform = sitk.CompositeTransform(transform)
+    centered_transform.AddTransform(centering_transform)
+
+    # sitk.Show(sitk.Resample(original_CT, reference_image, centered_transform, sitk.sitkLinear, 0.0))
+    
+    return sitk.Resample(original_CT, reference_image, centered_transform, sitk.sitkLinear, 0.0)
+
+
 def prepare_image_fmc(input_path, output_path=None, identifier='*.tif', descriptor='', normalize=[0,100],\
-                   get_surfacedistance=False, get_lightmap=False, get_normalized_intensity=False, overwrite=False):
+                   get_surfacedistance=False, get_lightmap=False, use_fmc_percentile_normalization=False, overwrite=False):
     
     meta_data = get_fmc_metadata(input_path)
 
@@ -240,14 +309,29 @@ def prepare_image_fmc(input_path, output_path=None, identifier='*.tif', descript
 
     # load the image
     input_image = io.imread(input_path)
+    input_image = input_image.astype(np.float32)
+
+    #print_timestamp('Resampling Image with ITK')
+    #small_input_image = resample_image_itk(input_image, image_spacing=image_spacing, resize_factor=0.5)
+    #print_timestamp('Done')
+
+    #test = 1
+
+    #print_timestamp('Resampling Image with skimage')
     small_input_image = zoom(input_image, (image_spacing[0], image_spacing[1], image_spacing[2]))
+    #print_timestamp('Done')
 
     original_size = input_image.shape
     downsampled_size = small_input_image.shape
     upsampling_factors = np.array(original_size) / np.array(downsampled_size)
 
+    save_imgs = []
+    if use_fmc_percentile_normalization:
+        save_imgs = [fmc_percentile_normalization(input_image),] 
+    else:
+        save_imgs = [input_image,]
+
     # save raw image
-    save_imgs = [input_image,]
     save_groups = ['raw_image',]
     
     if get_lightmap:
@@ -280,12 +364,17 @@ def prepare_image_fmc(input_path, output_path=None, identifier='*.tif', descript
         
         save_imgs.append(light_map_image.astype(np.uint16))
         save_groups.append('light_map')
+        print_timestamp('Done extracting light map image...')
         
     if get_surfacedistance:
         
         print_timestamp('Extracting distance image...')
 
-        convex_image = compute_convex_image(small_input_image, image_spacing)
+        zoom_factor = None
+        if np.max(small_input_image.shape) > 500:
+            zoom_factor = 0.5
+
+        convex_image = compute_convex_image(small_input_image, image_spacing, zoom_factor=zoom_factor)
         edt_image = distance_transform_edt(convex_image)
 
         edt_image = zoom(edt_image.astype(np.uint16), (upsampling_factors[0], upsampling_factors[1], upsampling_factors[2]))
@@ -293,12 +382,15 @@ def prepare_image_fmc(input_path, output_path=None, identifier='*.tif', descript
         
         save_imgs.append(edt_image.astype(np.uint16))
         save_groups.append('surface_distance')
-        
+
+        print_timestamp('Done extracting distance map image...')
+
+    """
     if get_normalized_intensity:
         
         print_timestamp('Extracting normalized intensity image...')
         
-                    # normalize the image
+        # normalize the image
         perc1, perc2 = np.percentile(input_image.astype(np.float32), list(normalize))
         input_image = input_image.astype(np.float32)
         input_image -= perc1
@@ -308,5 +400,6 @@ def prepare_image_fmc(input_path, output_path=None, identifier='*.tif', descript
         
         save_imgs.append(input_image.astype(np.float32))
         save_groups.append('normalized_intensity')
+    """        
 
     h5_writer(save_imgs, save_name, group_root='data', group_names=save_groups)

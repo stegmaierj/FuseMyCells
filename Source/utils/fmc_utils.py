@@ -115,9 +115,18 @@ def get_fmc_light_direction(input_image, debug_figures=False):
     slopes = -np.sign([slope_z[0], slope_y[0], slope_x[0]])
     return slopes
 
-def compute_convex_image(input_image, image_spacing, gaussian_sigma=1.0):
+def compute_convex_image(input_image, image_spacing, gaussian_sigma=1.0, zoom_factor=None):
 
-    smoothed_image = filters.gaussian(input_image, (gaussian_sigma*image_spacing[0], gaussian_sigma*image_spacing[1], gaussian_sigma*image_spacing[2]))
+    input_image_size = input_image.shape
+
+    input_image_small = input_image
+    upsampling_factors = np.array([1.0,1.0,1.0])
+    if not zoom_factor == None:
+        input_image_small = zoom(input_image, (zoom_factor, zoom_factor, zoom_factor))
+        input_image_small_size = input_image_small.shape
+        upsampling_factors = np.array(input_image_size) / np.array(input_image_small_size)
+      
+    smoothed_image = filters.gaussian(input_image_small, (gaussian_sigma*image_spacing[0], gaussian_sigma*image_spacing[1], gaussian_sigma*image_spacing[2]))
 
     binary_image = np.zeros_like(smoothed_image)
     binary_image[smoothed_image > np.mean(smoothed_image[:])] = 1
@@ -148,6 +157,9 @@ def compute_convex_image(input_image, image_spacing, gaussian_sigma=1.0):
     convex_image = np.zeros_like(binary_image)
     convex_image[bounding_box[0]:bounding_box[3], bounding_box[1]:bounding_box[4], bounding_box[2]:bounding_box[5]] = region_props[0].convex_image
 
+    if not zoom_factor == None:
+        convex_image = zoom(convex_image, (upsampling_factors[0], upsampling_factors[1], upsampling_factors[2]))
+    
     return convex_image
 
 

@@ -31,10 +31,10 @@ def main(hparams):
 
     if "_fused" not in input_file:
         prepare_image_fmc(input_file, output_path=output_path, identifier='*.tif', descriptor='', normalize=[1,99],\
-                       get_surfacedistance=True, get_lightmap=True, get_normalized_intensity=True)
+                       get_surfacedistance=True, get_lightmap=True, use_fmc_percentile_normalization=True, overwrite=False)
     else:
         prepare_image_fmc(input_file, output_path=output_path, identifier='*.tif', descriptor='', normalize=[1,99],\
-                       get_surfacedistance=False, get_lightmap=False, get_normalized_intensity=False)
+                       get_surfacedistance=False, get_lightmap=False, use_fmc_percentile_normalization=True, overwrite=False)
 
 if __name__ == '__main__':
     # ------------------------
