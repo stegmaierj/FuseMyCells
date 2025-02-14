@@ -23,28 +23,28 @@ from resources.apply_script_docker import fmc_entry_point
 
 print(" END IMPORT ")
 
-localDebugPrefix = "/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Docker"
+localDebugPrefix = "/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Docker/"
 
-INPUT_PATH = Path(localDebugPrefix + "/input/images/fluorescence-lightsheet-3D-microscopy")
+INPUT_PATH = Path(localDebugPrefix + "input/images/fluorescence-lightsheet-3D-microscopy")
 print(f" INPUT_PATH IS   " + str(INPUT_PATH))
 os.system("ls -l " + str(INPUT_PATH))
 
-OUTPUT_PATH = Path(localDebugPrefix + "/output")
+OUTPUT_PATH = Path(localDebugPrefix + "output")
 if not isdir(join(OUTPUT_PATH,"images")):
     mkdir(join(OUTPUT_PATH, "images"))
 
-OUTPUT_PATH = Path(localDebugPrefix + "/output/images")
+OUTPUT_PATH = Path(localDebugPrefix + "output/images")
 if not isdir(join(OUTPUT_PATH, "fused-fluorescence-lightsheet-3D-microscopy")):
     mkdir(join(OUTPUT_PATH, "fused-fluorescence-lightsheet-3D-microscopy"))
 
-OUTPUT_PATH = Path(localDebugPrefix + "/output/images/fused-fluorescence-lightsheet-3D-microscopy")
+OUTPUT_PATH = Path(localDebugPrefix + "output/images/fused-fluorescence-lightsheet-3D-microscopy")
 print(" OUTPUT IS  " + str(OUTPUT_PATH))
 
 RESOURCE_PATH = Path("resources") #WEIGHTS NEED TO BE PUT IN RESOURCE_PATH
 print(" RESOURCE_PATH IS   " + str(RESOURCE_PATH))
 os.system("ls -l " + str(RESOURCE_PATH))
 
-TMP_PATH = Path(localDebugPrefix + "/tmp/")
+TMP_PATH = Path(localDebugPrefix + "tmp/")
 print(" TMP PATH IS  " + str(TMP_PATH))
 
 def run():
@@ -66,7 +66,7 @@ def run():
             study_number = int(metadata['study'])
             model_suffix = "Nucleus" if "nucleus" in input_file_name else "Membrane"
 
-            ckpt_path = "%s/%s/weights/Study%i_%s.ckpt" % (localDebugPrefix, RESOURCE_PATH, study_number, model_suffix)
+            ckpt_path = "%s%s/weights/Study%i_%s.ckpt" % (localDebugPrefix, RESOURCE_PATH, study_number, model_suffix)
 
             input_path_tif = join(INPUT_PATH,input_file_name)
             input_name_h5 = join(str(TMP_PATH), input_file_name.replace(".tif", ".h5"))
