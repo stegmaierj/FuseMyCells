@@ -27,8 +27,11 @@ def fmc_process_image(hparams, network):
     # set hyperparameters for FMC
     hparams.crop = (5, 15, 15)
     hparams.overlap = (5, 15, 15)
-    hparams.gpus = 0
+    hparams.gpus = 1
     hparams.patch_size = (64, 256, 256)
+
+    if not torch.cuda.is_available():
+        hparams.gpus = 0
 
     #hparams.test_list = "/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Source/data/Study1_membrane_test_singleFile.csv"
 
