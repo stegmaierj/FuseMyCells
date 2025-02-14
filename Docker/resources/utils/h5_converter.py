@@ -14,8 +14,8 @@ from scipy.ndimage import distance_transform_edt, gaussian_filter, zoom, generic
 from scipy.ndimage.morphology import binary_fill_holes
 from scipy.spatial import ConvexHull, Delaunay
 
-from utils.utils import print_timestamp
-from utils.fmc_utils import get_fmc_gradient_info, get_fmc_light_direction, get_fmc_metadata, compute_convex_image
+from resources.utils.utils import print_timestamp
+from resources.utils.fmc_utils import get_fmc_gradient_info, get_fmc_light_direction, get_fmc_metadata, compute_convex_image
 
 import SimpleITK as sitk
 
