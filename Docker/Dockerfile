@@ -20,8 +20,8 @@ RUN python -m pip install \
     --no-color \
     --requirement /opt/app/requirements.txt
 
-COPY --chown=user:user mynetwork.py /opt/app/
-COPY --chown=user:user tools.py /opt/app/
+#COPY --chown=user:user mynetwork.py /opt/app/
+#COPY --chown=user:user tools.py /opt/app/
 COPY --chown=user:user inference.py /opt/app/
 
 ENTRYPOINT ["python", "inference.py"]
