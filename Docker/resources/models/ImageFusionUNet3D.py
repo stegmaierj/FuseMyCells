@@ -51,8 +51,12 @@ class ImageFusionUNet3D(pl.LightningModule):
     def load_pretrained(self, pretrained_file, strict=True, verbose=True):
         
         # Load the state dict
-        state_dict = torch.load(pretrained_file)['state_dict']
-        
+        state_dict = []
+        if torch.cuda.is_available():
+	    state_dict = torch.load(pretrained_file)['state_dict']
+	else:
+            state_dict = torch.load(pretrained_file, map_location=torch.device('cpu'))['state_dict']
+            
         # Make sure to have a weight dict
         if not isinstance(state_dict, dict):
             state_dict = dict(state_dict)

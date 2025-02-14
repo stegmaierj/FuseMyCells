@@ -67,7 +67,7 @@ def run():
             study_number = int(metadata['study'])
             model_suffix = "Nucleus" if "nucleus" in input_file_name else "Membrane"
 
-            ckpt_path = "%s/%s/weights/Study%i_%s.ckpt" % (localDebugPrefix, RESOURCE_PATH, study_number, model_suffix)
+            ckpt_path = "%s%s/weights/Study%i_%s.ckpt" % (localDebugPrefix, RESOURCE_PATH, study_number, model_suffix)
 
             input_path_tif = join(INPUT_PATH,input_file_name)
             input_name_h5 = join(str(TMP_PATH), input_file_name.replace(".tif", ".h5"))
