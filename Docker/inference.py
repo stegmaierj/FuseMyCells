@@ -23,8 +23,8 @@ from resources.apply_script_docker import fmc_entry_point
 
 print(" END IMPORT ")
 
-#localDebugPrefix = "/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Docker"
-localDebugPrefix = ""
+localDebugPrefix = "/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Docker"
+#localDebugPrefix = ""
 
 INPUT_PATH = Path(localDebugPrefix + "/input/images/fluorescence-lightsheet-3D-microscopy")
 print(f" INPUT_PATH IS   " + str(INPUT_PATH))
@@ -64,7 +64,11 @@ def run():
             image_groups = ["data/raw_image", "data/surface_distance", "data/light_map"]
             in_channels = 3
 
-            study_number = int(metadata['study'])
+            if 'study' in metadata:
+                study_number = int(metadata['study'])
+            else:
+                study_number = 4
+                
             model_suffix = "Nucleus" if "nucleus" in input_file_name else "Membrane"
 
             ckpt_path = "%s%s/weights/Study%i_%s.ckpt" % (localDebugPrefix, RESOURCE_PATH, study_number, model_suffix)
@@ -89,7 +93,7 @@ def run():
                        )
             
             os.remove(input_name_csv)
-            #os.remove(input_name_h5)
+            os.remove(input_name_h5)
 
     print(" --> LIST OUTPUT IMAGES IN "+str(OUTPUT_PATH))
 
