@@ -4,6 +4,7 @@ FROM --platform=linux/amd64 pytorch/pytorch:2.6.0-cuda12.6-cudnn9-runtime
 # Ensures that Python output to stdout/stderr is not buffered: prevents missing information when terminating
 ENV PYTHONUNBUFFERED 1
 
+ENV PATH="$PATH:/home/user/.local/bin"
 
 RUN groupadd -r user && useradd -m --no-log-init -r -g user user
 USER user

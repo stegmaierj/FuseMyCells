@@ -23,7 +23,8 @@ from resources.apply_script_docker import fmc_entry_point
 
 print(" END IMPORT ")
 
-localDebugPrefix = "/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Docker"
+#localDebugPrefix = "/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Docker"
+localDebugPrefix = ""
 
 INPUT_PATH = Path(localDebugPrefix + "/input/images/fluorescence-lightsheet-3D-microscopy")
 print(f" INPUT_PATH IS   " + str(INPUT_PATH))

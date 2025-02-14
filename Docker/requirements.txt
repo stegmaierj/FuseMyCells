@@ -6,6 +6,7 @@ Pillow==11.1.0
 pytorch_lightning==2.5.0.post0
 scipy==1.15.1
 scikit-image
+SimpleITK
 tifffile
 torch==2.6.0
 torchmetrics==1.6.1

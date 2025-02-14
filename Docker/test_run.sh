@@ -3,16 +3,12 @@
 # Stop at first error
 set -e
 
-echo "Blubb"
-
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 DOCKER_TAG="example-algorithm-phase-1"
 DOCKER_NOOP_VOLUME="${DOCKER_TAG}-volume"
 
 INPUT_DIR="${SCRIPT_DIR}/input"
 OUTPUT_DIR="${SCRIPT_DIR}/output"
-
-DOCKER_NOOP_VOLUME="${SCRIPT_DIR}/tmp" ## remove!!!
 
 echo $INPUT_DIR
 echo $OUTPUT_DIR
@@ -43,7 +39,7 @@ echo "=+= Doing a forward pass"
 # '--volume <NAME>:/tmp'
 #   is added because on Grand Challenge this directory cannot be used to store permanent files
 
-#docker volume create "$DOCKER_NOOP_VOLUME" # reenable!!!
+docker volume create "$DOCKER_NOOP_VOLUME"
 docker run --rm \
     --platform=linux/amd64 \
     --network none \
