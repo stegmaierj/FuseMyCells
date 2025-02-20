@@ -55,6 +55,59 @@ def get_fmc_gradient_info(study_number):
     return z_gradient, y_gradient, x_gradient
 
 
+def fmc_guess_dataset(metadata):
+
+    image_sizes_study = np.zeros((5,3))
+    image_sizes_study[0,:] = [222, 731, 860]
+    image_sizes_study[1,:] = [264, 2008, 1091]
+    image_sizes_study[2,:] = [891, 817, 817]
+    image_sizes_study[3,:] = [80, 1920, 1920]
+    image_sizes_study[4,:] = [309, 1920, 1920]
+
+    image_spacing_study = np.zeros((5,3))
+    image_spacing_study[0,:] = [1.0, 0.195, 0.195]
+    image_spacing_study[1,:] = [1.0, 0.195, 0.195]
+    image_spacing_study[2,:] = [1.0, 0.39, 0.39]
+    image_spacing_study[3,:] = [3.0, 0.33, 0.33]
+    image_spacing_study[4,:] = [1.01, 0.388, 0.388]
+
+    image_size_query = metadata['shape']
+    image_spacing_query = [metadata['PhysicalSizeZ'], metadata['PhysicalSizeY'], metadata['PhysicalSizeX']]
+
+    min_index = 0
+    min_distance = 9999999
+
+    # nucleus data sets are 1, 2, 3, 4, 5
+    if metadata['channel'] == 'nucleus':
+
+        for i in range(0,5):
+            size_distance = np.linalg.norm([image_sizes_study[i] - image_size_query])
+            spacing_distance = np.linalg.norm([image_spacing_study[i] - image_spacing_query])
+
+            if (size_distance < min_distance):
+                min_index = i
+                min_distance = size_distance
+
+        return min_index + 1, 'nucleus'
+
+    # membrane data sets are 1, 3
+    else:
+        
+        for i in [0,2]:
+            size_distance = np.linalg.norm([image_sizes_study[i] - image_size_query])
+            spacing_distance = np.linalg.norm([image_spacing_study[i] - image_spacing_query])
+
+            if (size_distance < min_distance):
+                min_index = i
+                min_distance = size_distance
+
+        return min_index + 1, 'membrane'
+    
+
+
+
+
+
 def get_centroids(input_image, normalize=False):
 
 

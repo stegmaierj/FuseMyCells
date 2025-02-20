@@ -17,7 +17,7 @@ import numpy as np
 import tifffile
 
 # from tools import percentile_normalization
-from resources.utils.fmc_utils import get_fmc_metadata
+from resources.utils.fmc_utils import get_fmc_metadata, fmc_guess_dataset
 from resources.utils.h5_converter import prepare_image_fmc
 from resources.apply_script_docker import fmc_entry_point
 
@@ -49,51 +49,66 @@ TMP_PATH = Path(localDebugPrefix + "/tmp/")
 print(" TMP PATH IS  " + str(TMP_PATH))
 
 def run():
-    print(" LOAD NETWORK ")
-    # model = mynetwork
-    # weight_file = join(RESOURCE_PATH, your_model.keras")
-    # model.load_weights(weight_file)
 
     print(f" LIST IMAGES IN  {INPUT_PATH} ")
 
     for input_file_name in listdir(INPUT_PATH):
         if input_file_name.endswith("tiff") or input_file_name.endswith("tif"):
+
+            # load input image and get meta data
             print(" --> Predict " + input_file_name)
             image_input, metadata = read_image(join(INPUT_PATH,input_file_name))
 
-            image_groups = ["data/raw_image", "data/surface_distance", "data/light_map"]
-            in_channels = 3
-
+            # determine which model to use
+            study_number = -1
+            model_suffix = "Nucleus" if "nucleus" in input_file_name else "Membrane"
             if 'study' in metadata:
                 study_number = int(metadata['study'])
             else:
-                study_number = 4
+                study_number, model_suffix = fmc_guess_dataset(metadata)
 
-            model_suffix = "Nucleus" if "nucleus" in input_file_name else "Membrane"
-
+            # find the checkpoint to be used
+            print("File %s will be processed with model for study %i and %s" % (input_file_name, study_number, model_suffix))     
             ckpt_path = "%s%s/weights/Study%i_%s.ckpt" % (localDebugPrefix, RESOURCE_PATH, study_number, model_suffix)
+            print("Using checkpoint path %s" % (ckpt_path))
+
+            image_groups = ["data/raw_image", "data/surface_distance"]
+            in_channels = 2
 
             input_path_tif = join(INPUT_PATH,input_file_name)
             input_name_h5 = join(str(TMP_PATH), input_file_name.replace(".tif", ".h5"))
             input_name_csv = join(str(TMP_PATH), input_file_name.replace(".tif", ".csv"))
 
+            print("Input path Tiff is set to %s" % (input_path_tif))
+            print("Input path H5 is set to %s" % (input_name_h5))
+            print("Input path CSV is set to %s" % (input_name_csv))
+
             with open(input_name_csv, 'w', newline='') as fh:
                 writer = csv.writer(fh, delimiter=';')
                 writer.writerow([input_name_h5, input_name_h5])
 
+            print("Trying to perform preprocessing ... ")
             prepare_image_fmc(input_path_tif, output_path=join(str(TMP_PATH),''), identifier='*.tif', descriptor='', normalize=[1,99],\
                        get_surfacedistance=True, get_lightmap=True, use_fmc_percentile_normalization=True, overwrite=False)
 
-            # Prediction
-            image_predict = fmc_entry_point(input_name_csv, ckpt_path, in_channels, image_groups)
+            print("Successfully finished preprocessing ... ")
 
+            # Prediction
+            print("Trying to perform the prediction ... ")
+            image_predict = fmc_entry_point(input_name_csv, ckpt_path, in_channels, image_groups)
+            print("Successfully finished prediction ... ")
+
+            print("Trying to save result image ... ")
             save_image(location = join(OUTPUT_PATH, basename(input_file_name)),
                        array = image_predict,
                        metadata = metadata
                        )
+            print("Successfully saved result image ... ")
             
+            print("Trying to remove temporary files ... ")
             os.remove(input_name_csv)
-            #os.remove(input_name_h5)
+            os.remove(input_name_h5)
+            print("Successfully removed temporary files ...")
 
     print(" --> LIST OUTPUT IMAGES IN "+str(OUTPUT_PATH))
 
@@ -102,7 +117,57 @@ def run():
     return 0
 
 
+def standardize_metadata(metadata : dict):
+    key_map = {
+        "spacing": ["spacing"],
+        "PhysicalSizeX": ["PhysicalSizeX", "physicalsizex", "physical_size_x"],
+        "PhysicalSizeY": ["PhysicalSizeY", "physicalsizey", "physical_size_y"],
+        "PhysicalSizeZ": ["PhysicalSizeZ", "physicalsizez", "physical_size_z"],
+        "unit": ["unit"],
+        "axes": ["axes"],
+        "channel": ["channel"],
+        "shape": ["shape"],
+        "study": ["study"],
+    }
 
+    # Normalize metadata by looking up possible keys
+    standardized_metadata = {}
+    for standard_key, possible_keys in key_map.items():
+        for key in possible_keys:
+            if key in metadata:
+                standardized_metadata[standard_key] = metadata[key]
+                break  # Stop once we find the first available key
+
+    return standardized_metadata
+
+
+
+def read_image(location): # WARNING IMAGE DATA EN ZYX
+    import tifffile
+    # Read the TIFF file and get the image and metadata
+    with tifffile.TiffFile(location) as tif:
+
+        image_data = tif.asarray() # Extract image array data
+
+        if tif.shaped_metadata is not None:
+            shp_metadata = tif.shaped_metadata[0]
+            metadata = standardize_metadata(shp_metadata)
+
+            return image_data, metadata
+        else:
+            if tif.imagej_metadata is not None:
+                shape = list(image_data.shape)
+                imgj_metadata = tif.imagej_metadata
+                imgj_metadata['shape'] = shape
+                metadata = standardize_metadata(imgj_metadata)
+
+                return image_data, metadata
+
+            else:
+                metadata = tif.pages[0].tags['ImageDescription'].value
+                print(f"error loading metadata: {metadata}, type of object : {type(metadata)}")
+
+"""
 def read_image(location): # WARNING IMAGE DATA EN ZYX
     # Read the TIFF file and get the image and metadata
     with tifffile.TiffFile(location) as tif:
@@ -117,6 +182,7 @@ def read_image(location): # WARNING IMAGE DATA EN ZYX
             return image_data, metadata
         else:
             return image_data, metadata[0]
+"""
 
 
 def save_image(*, location, array, metadata):
