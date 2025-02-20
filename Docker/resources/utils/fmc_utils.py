@@ -2,18 +2,22 @@ import os
 import h5py
 import glob
 import numpy as np
+import scipy
 
 from skimage import io, filters
+
+from scipy.spatial import ConvexHull
 
 from skimage.measure import label, regionprops, regionprops_table
 
 from skimage.morphology import binary_opening, binary_erosion
 
 from scipy.ndimage import zoom
+import SimpleITK as sitk
 
 import matplotlib.pyplot as plt
 
-from PIL import Image
+from PIL import Image, ImageDraw
 from PIL.TiffTags import TAGS
 
 
@@ -30,6 +34,26 @@ def get_fmc_metadata(input_image_file):
             meta_data[split_string[0]] = split_string[1]
 
     return meta_data
+
+def get_fmc_gradient_info(study_number):
+    x_gradient = False
+    y_gradient = False
+    z_gradient = False
+    if study_number==1:
+        z_gradient = True
+    elif study_number==2:
+        z_gradient = True
+    elif study_number==3:
+        x_gradient = True
+        y_gradient = True
+        z_gradient = True
+    elif study_number==4:
+        x_gradient = True
+    elif study_number==5:
+        x_gradient = True
+
+    return z_gradient, y_gradient, x_gradient
+
 
 def fmc_guess_dataset(metadata):
 
@@ -80,26 +104,54 @@ def fmc_guess_dataset(metadata):
         return min_index + 1, 'membrane'
     
 
-def get_fmc_gradient_info(study_number):
-    x_gradient = False
-    y_gradient = False
-    z_gradient = False
-    if study_number==1:
-        z_gradient = True
-    elif study_number==2:
-        z_gradient = True
-    elif study_number==3:
-        x_gradient = True
-        y_gradient = True
-        z_gradient = True
-    elif study_number==4:
-        x_gradient = True
-    elif study_number==5:
-        x_gradient = True
 
-    return z_gradient, y_gradient, x_gradient
 
-def get_fmc_light_direction(input_image, debug_figures=False):
+
+
+def get_centroids(input_image, normalize=False):
+
+
+    perc1, perc2 = np.percentile(input_image.astype(np.float32), list([50, 90]))
+
+    binary_image_median = np.zeros_like(input_image)
+    binary_image_median[input_image > perc1] = 1
+    binary_image_upper = np.zeros_like(input_image)
+    binary_image_upper[input_image > perc2] = 1
+
+    #weight_map_image = np.multiply(binary_image, input_image)
+    #weight_map_image /= np.sum(weight_map_image)
+
+    pixel_coordinates_median = np.where(binary_image_median)
+    centroid_median = np.average(pixel_coordinates_median, axis=1)
+
+    pixel_coordinates_upper = np.where(binary_image_upper)
+    centroid_upper = np.average(pixel_coordinates_upper, axis=1)
+
+    #weighted_centroid = [np.sum(np.multiply(weight_map_image[pixel_coordinates], pixel_coordinates[0])), \
+    #                        np.sum(np.multiply(weight_map_image[pixel_coordinates], pixel_coordinates[1]))]
+
+    if normalize:
+        centroid_median /= np.linalg.norm(centroid_median)
+        centroid_upper /= np.linalg.norm(centroid_upper)
+    
+    return np.array(centroid_median), np.array(centroid_upper)
+
+
+def get_fmc_light_direction(input_image):
+    
+    image_size = input_image.shape
+
+    centroid, centroid_weighted = get_centroids(input_image)
+    
+    centroid = np.divide(centroid, image_size)
+    centroid_weighted = np.divide(centroid_weighted, image_size)
+    differences = centroid_weighted - centroid
+    differences /= np.linalg.norm(differences)
+
+    return differences
+
+
+def get_fmc_light_direction_regression(input_image, debug_figures=False):
 
     # get the intensity statistics
     #min_intensity = np.min(input_image)
@@ -167,7 +219,7 @@ def get_fmc_light_direction(input_image, debug_figures=False):
 def compute_convex_image(input_image, image_spacing, gaussian_sigma=1.0):
 
     # smooth image to remove some noise before thresholding    
-    smoothed_image = filters.gaussian(input_image, (gaussian_sigma*image_spacing[0], gaussian_sigma*image_spacing[1], gaussian_sigma*image_spacing[2]))
+    smoothed_image = filters.gaussian(input_image, (gaussian_sigma, gaussian_sigma, gaussian_sigma))
 
     binary_image = np.zeros_like(smoothed_image)
     binary_image[smoothed_image > np.mean(smoothed_image[:])] = 1
@@ -191,12 +243,16 @@ def compute_convex_image(input_image, image_spacing, gaussian_sigma=1.0):
 
     binary_image = binary_image.astype(np.uint8) - binary_erosion(binary_image).astype(np.uint8)
 
-    region_props = regionprops(binary_image)
-    bounding_box = region_props[0].bbox
+    #binary_image = np.pad(binary_image, 2)
 
-    convex_image = np.zeros_like(binary_image)
-    convex_image[bounding_box[0]:bounding_box[3], bounding_box[1]:bounding_box[4], bounding_box[2]:bounding_box[5]] = region_props[0].convex_image
-    
+    convex_image = flood_fill_hull(binary_image)
+
+    #region_props = regionprops(binary_image)
+    #bounding_box = region_props[0].bbox
+
+    #convex_image = np.zeros_like(binary_image)
+    #convex_image[bounding_box[0]:bounding_box[3], bounding_box[1]:bounding_box[4], bounding_box[2]:bounding_box[5]] = region_props[0].convex_image
+   
     return convex_image
 
 """
@@ -257,3 +313,14 @@ def create_maximum_intensity_projections(input_image):
 
     return projection_xy, projection_xz, projection_yz
 
+
+# credits for this fast convex hull computation go to Daniel F (https://stackoverflow.com/questions/46310603/how-to-compute-convex-hull-image-volume-in-3d-numpy-arrays)
+def flood_fill_hull(image):    
+    points = np.transpose(np.where(image))
+    hull = scipy.spatial.ConvexHull(points)
+    deln = scipy.spatial.Delaunay(points[hull.vertices]) 
+    idx = np.stack(np.indices(image.shape), axis = -1)
+    out_idx = np.nonzero(deln.find_simplex(idx) + 1)
+    out_img = np.zeros(image.shape)
+    out_img[out_idx] = 1
+    return out_img
