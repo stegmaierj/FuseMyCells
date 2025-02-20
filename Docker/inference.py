@@ -61,7 +61,7 @@ def run():
 
             # determine which model to use
             study_number = -1
-            model_suffix = "Nucleus" if "nucleus" in input_file_name else "Membrane"
+            model_suffix = "Nucleus" if metadata['channel'] == 'nucleus' else "Membrane"
             if 'study' in metadata:
                 study_number = int(metadata['study'])
             else:
