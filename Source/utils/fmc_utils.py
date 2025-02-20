@@ -102,10 +102,6 @@ def fmc_guess_dataset(metadata):
                 min_distance = size_distance
 
         return min_index + 1, 'membrane'
-    
-
-
-
 
 
 def get_centroids(input_image, normalize=False):

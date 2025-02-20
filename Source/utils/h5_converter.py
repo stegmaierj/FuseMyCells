@@ -280,14 +280,14 @@ def resample_image_itk(input_image, image_spacing=[1.0, 1.0, 1.0], resize_factor
     return sitk.Resample(original_CT, reference_image, centered_transform, sitk.sitkLinear, 0.0)
 
 
-def prepare_image_fmc(input_path, output_path=None, identifier='*.tif', descriptor='', normalize=[0,100],\
+def prepare_image_fmc(input_path, input_image, metadata, output_path=None, identifier='*.tif', descriptor='', normalize=[0,100],\
                    get_surfacedistance=False, get_lightmap=False, use_fmc_percentile_normalization=False, overwrite=False, use_itk=True):
     
-    meta_data = get_fmc_metadata(input_path)
+    #meta_data = get_fmc_metadata(input_path)
 
     current_study = 0
-    if 'study' in meta_data.keys():
-        current_study = int(meta_data['study'])
+    if 'study' in metadata.keys():
+        current_study = int(metadata['study'])
     else:
         current_study = 4
         print('Meta information for study not found for current file! Setting it hard-coded to 4!')
@@ -301,20 +301,20 @@ def prepare_image_fmc(input_path, output_path=None, identifier='*.tif', descript
         downsampling_factor_z = 5
         downsampling_factor_xy = 5
 
-    image_spacing = [float(meta_data['physical_size_z']), float(meta_data['physical_size_y']), float(meta_data['physical_size_x'])]
-    image_spacing_small = [float(meta_data['physical_size_z'])*downsampling_factor_z, \
-                           float(meta_data['physical_size_y'])*downsampling_factor_xy, \
-                           float(meta_data['physical_size_x'])*downsampling_factor_xy]
+    image_spacing = [float(metadata['physical_size_z']), float(metadata['physical_size_y']), float(metadata['physical_size_x'])]
+    image_spacing_small = [float(metadata['physical_size_z'])*downsampling_factor_z, \
+                           float(metadata['physical_size_y'])*downsampling_factor_xy, \
+                           float(metadata['physical_size_x'])*downsampling_factor_xy]
 
     # save the data
     head, tail = os.path.split(input_path)
     save_name = ''
     if (output_path == None):
-        save_name = input_path.replace('.tif', '.h5')
+        save_name = input_path.replace('.tiff', '.h5').replace('.tif', '.h5')
     else:
         if not isdir(output_path):
             mkdir(output_path)
-        save_name = output_path + tail.replace('.tif', '.h5')
+        save_name = output_path + tail.replace('.tiff', '.h5').replace('.tif', '.h5')
 
     if isfile(save_name) and not overwrite:
         try: 

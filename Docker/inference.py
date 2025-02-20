@@ -76,8 +76,8 @@ def run():
             in_channels = 2
 
             input_path_tif = join(INPUT_PATH,input_file_name)
-            input_name_h5 = join(str(TMP_PATH), input_file_name.replace(".tif", ".h5"))
-            input_name_csv = join(str(TMP_PATH), input_file_name.replace(".tif", ".csv"))
+            input_name_h5 = join(str(TMP_PATH), input_file_name.replace(".tiff", ".h5").replace(".tif", ".h5"))
+            input_name_csv = join(str(TMP_PATH), input_file_name.replace(".tiff", ".csv").replace(".tif", ".csv"))
 
             print("Input path Tiff is set to %s" % (input_path_tif))
             print("Input path H5 is set to %s" % (input_name_h5))
@@ -88,7 +88,7 @@ def run():
                 writer.writerow([input_name_h5, input_name_h5])
 
             print("Trying to perform preprocessing ... ")
-            prepare_image_fmc(input_path_tif, output_path=join(str(TMP_PATH),''), identifier='*.tif', descriptor='', normalize=[1,99],\
+            prepare_image_fmc(input_path_tif, image_input, metadata, output_path=join(str(TMP_PATH),''), identifier='*.tif', descriptor='', normalize=[1,99],\
                        get_surfacedistance=True, get_lightmap=True, use_fmc_percentile_normalization=True, overwrite=False)
 
             print("Successfully finished preprocessing ... ")

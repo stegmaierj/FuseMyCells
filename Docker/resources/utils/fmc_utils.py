@@ -104,10 +104,6 @@ def fmc_guess_dataset(metadata):
         return min_index + 1, 'membrane'
     
 
-
-
-
-
 def get_centroids(input_image, normalize=False):
 
 
