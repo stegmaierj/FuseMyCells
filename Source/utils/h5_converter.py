@@ -15,7 +15,7 @@ from scipy.ndimage.morphology import binary_fill_holes
 from scipy.spatial import ConvexHull, Delaunay
 
 from utils.utils import print_timestamp
-from utils.fmc_utils import get_fmc_gradient_info, get_fmc_light_direction, get_fmc_metadata, compute_convex_image
+from utils.fmc_utils import get_fmc_gradient_info, get_fmc_light_direction, get_fmc_metadata, compute_convex_image, get_centroids
 
 import SimpleITK as sitk
 
@@ -297,6 +297,9 @@ def prepare_image_fmc(input_path, output_path=None, identifier='*.tif', descript
     if current_study == 3:
         downsampling_factor_z = 5
         downsampling_factor_xy = 5
+    elif current_study == 5:
+        downsampling_factor_z = 5
+        downsampling_factor_xy = 5
 
     image_spacing = [float(meta_data['physical_size_z']), float(meta_data['physical_size_y']), float(meta_data['physical_size_x'])]
     image_spacing_small = [float(meta_data['physical_size_z'])*downsampling_factor_z, \
@@ -314,7 +317,15 @@ def prepare_image_fmc(input_path, output_path=None, identifier='*.tif', descript
         save_name = output_path + tail.replace('.tif', '.h5')
 
     if isfile(save_name) and not overwrite:
-        return
+        try: 
+            file_handle = h5py.File(save_name, 'r')
+
+            if file_handle:
+                print("File %s already exists and seems to be valid. Skipping processing ..." % (save_name))
+                return
+        except:
+            os.remove(save_name)
+            print("File %s will be reprocessed as H5 file seems corrupt ..." % (save_name))
 
     # load the image
     input_image = io.imread(input_path)
@@ -351,6 +362,7 @@ def prepare_image_fmc(input_path, output_path=None, identifier='*.tif', descript
         light_map_image = np.ones_like(small_input_image)
 
         # get the light gradient
+        """
         gradient_z, gradient_y, gradient_x = get_fmc_gradient_info(current_study)
         slopes = get_fmc_light_direction(small_input_image, debug_figures=False)
 
@@ -367,6 +379,38 @@ def prepare_image_fmc(input_path, output_path=None, identifier='*.tif', descript
         if gradient_x and slopes[2] > 0:
             light_map_image[:, :, 0] = 0
         elif gradient_x and slopes[2] < 0:
+            light_map_image[:, :, -1] = 0
+        """
+
+        gradient_z, gradient_y, gradient_x = get_fmc_gradient_info(current_study)
+
+        centroid_median, centroid_90pct = get_centroids(small_input_image)
+        direction_to_light = centroid_90pct - centroid_median
+        direction_to_light /= np.linalg.norm(direction_to_light)
+        
+        #box_intersection = centroid_median
+
+        #while np.min(box_intersection < downsampled_size):
+        #    box_intersection += direction_to_light * image_spacing_small
+
+        #for i in range(0,2):
+        #    box_intersection[i] = np.max([0, np.min([box_intersection[i], downsampled_size[i]-1])])
+
+        #box_intersection = np.floor(box_intersection).astype(np.uint16)
+
+        if gradient_z and direction_to_light[0] <= 0:
+            light_map_image[0, ...] = 0
+        elif gradient_z and direction_to_light[0] > 0:
+            light_map_image[-1, ...] = 0
+
+        if gradient_y and direction_to_light[1] <= 0:
+            light_map_image[:, 0, :] = 0
+        elif gradient_y and direction_to_light[1] > 0:
+            light_map_image[:, -1, :] = 0
+
+        if gradient_x and direction_to_light[2] <= 0:
+            light_map_image[:, :, 0] = 0
+        elif gradient_x and direction_to_light[2] > 0:
             light_map_image[:, :, -1] = 0
 
         if use_itk:

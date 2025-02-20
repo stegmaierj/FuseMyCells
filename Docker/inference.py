@@ -93,7 +93,7 @@ def run():
                        )
             
             os.remove(input_name_csv)
-            os.remove(input_name_h5)
+            #os.remove(input_name_h5)
 
     print(" --> LIST OUTPUT IMAGES IN "+str(OUTPUT_PATH))
 

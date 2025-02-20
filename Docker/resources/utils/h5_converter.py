@@ -297,6 +297,9 @@ def prepare_image_fmc(input_path, output_path=None, identifier='*.tif', descript
     if current_study == 3:
         downsampling_factor_z = 5
         downsampling_factor_xy = 5
+    elif current_study == 5:
+        downsampling_factor_z = 5
+        downsampling_factor_xy = 5
 
     image_spacing = [float(meta_data['physical_size_z']), float(meta_data['physical_size_y']), float(meta_data['physical_size_x'])]
     image_spacing_small = [float(meta_data['physical_size_z'])*downsampling_factor_z, \
