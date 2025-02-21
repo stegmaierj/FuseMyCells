@@ -59,62 +59,69 @@ def run():
             print(" --> Predict " + input_file_name)
             image_input, metadata = read_image(join(INPUT_PATH,input_file_name))
 
-            # determine which model to use
-            study_number = -1
-            model_suffix = "Nucleus" if metadata['channel'] == 'nucleus' else "Membrane"
-            if 'study' in metadata:
-                study_number = int(metadata['study'])
+            skip_processing = True
+
+            if not skip_processing:
+                # determine which model to use
+                study_number = -1
+                model_suffix = "Nucleus" if metadata['channel'] == 'nucleus' else "Membrane"
+                if 'study' in metadata:
+                    study_number = int(metadata['study'])
+                else:
+                    study_number, model_suffix = fmc_guess_dataset(metadata)
+
+                # find the checkpoint to be used
+                print("File %s will be processed with model for study %i and %s" % (input_file_name, study_number, model_suffix))     
+                ckpt_path = "%s%s/weights/Study%i_%s.ckpt" % (localDebugPrefix, RESOURCE_PATH, study_number, model_suffix)
+                print("Using checkpoint path %s" % (ckpt_path))
+
+                image_groups = ["data/raw_image", "data/surface_distance"]
+                in_channels = 2
+
+                if study_number == 2:
+                    image_groups = ["data/raw_image", "data/light_map"]
+                elif study_number == 3 and metadata['channel'] == 'membrane':
+                    in_channels = 1
+                    image_groups = ["data/raw_image"]
+
+                input_path_tif = join(INPUT_PATH,input_file_name)
+                input_name_h5 = join(str(TMP_PATH), input_file_name.replace(".tiff", ".h5").replace(".tif", ".h5"))
+                input_name_csv = join(str(TMP_PATH), input_file_name.replace(".tiff", ".csv").replace(".tif", ".csv"))
+
+                print("Input path Tiff is set to %s" % (input_path_tif))
+                print("Input path H5 is set to %s" % (input_name_h5))
+                print("Input path CSV is set to %s" % (input_name_csv))
+
+                with open(input_name_csv, 'w', newline='') as fh:
+                    writer = csv.writer(fh, delimiter=';')
+                    writer.writerow([input_name_h5, input_name_h5])
+
+                print("Trying to perform preprocessing ... ")
+                prepare_image_fmc(input_path_tif, image_input, metadata, output_path=join(str(TMP_PATH),''), identifier='*.tif', descriptor='', normalize=[1,99],\
+                        get_surfacedistance=True, get_lightmap=True, use_fmc_percentile_normalization=True, overwrite=False)
+
+                print("Successfully finished preprocessing ... ")
+
+                # Prediction
+                print("Trying to perform the prediction ... ")
+                image_predict = fmc_entry_point(input_name_csv, ckpt_path, in_channels, image_groups)
+                print("Successfully finished prediction ... ")
+
+                print("Trying to remove temporary files ... ")
+                os.remove(input_name_csv)
+                os.remove(input_name_h5)
+                print("Successfully removed temporary files ...")
+                
             else:
-                study_number, model_suffix = fmc_guess_dataset(metadata)
-
-            # find the checkpoint to be used
-            print("File %s will be processed with model for study %i and %s" % (input_file_name, study_number, model_suffix))     
-            ckpt_path = "%s%s/weights/Study%i_%s.ckpt" % (localDebugPrefix, RESOURCE_PATH, study_number, model_suffix)
-            print("Using checkpoint path %s" % (ckpt_path))
-
-            image_groups = ["data/raw_image", "data/surface_distance"]
-            in_channels = 2
-
-            if study_number == 2:
-                image_groups = ["data/raw_image", "data/light_map"]
-            elif study_number == 3 and metadata['channel'] == 'membrane':
-                in_channels = 1
-                image_groups = ["data/raw_image"]
-
-            input_path_tif = join(INPUT_PATH,input_file_name)
-            input_name_h5 = join(str(TMP_PATH), input_file_name.replace(".tiff", ".h5").replace(".tif", ".h5"))
-            input_name_csv = join(str(TMP_PATH), input_file_name.replace(".tiff", ".csv").replace(".tif", ".csv"))
-
-            print("Input path Tiff is set to %s" % (input_path_tif))
-            print("Input path H5 is set to %s" % (input_name_h5))
-            print("Input path CSV is set to %s" % (input_name_csv))
-
-            with open(input_name_csv, 'w', newline='') as fh:
-                writer = csv.writer(fh, delimiter=';')
-                writer.writerow([input_name_h5, input_name_h5])
-
-            print("Trying to perform preprocessing ... ")
-            prepare_image_fmc(input_path_tif, image_input, metadata, output_path=join(str(TMP_PATH),''), identifier='*.tif', descriptor='', normalize=[1,99],\
-                       get_surfacedistance=True, get_lightmap=True, use_fmc_percentile_normalization=True, overwrite=False)
-
-            print("Successfully finished preprocessing ... ")
-
-            # Prediction
-            print("Trying to perform the prediction ... ")
-            image_predict = fmc_entry_point(input_name_csv, ckpt_path, in_channels, image_groups)
-            print("Successfully finished prediction ... ")
+                image_predict = image_input
 
             print("Trying to save result image ... ")
             save_image(location = join(OUTPUT_PATH, basename(input_file_name)),
                        array = image_predict,
                        metadata = metadata
                        )
-            print("Successfully saved result image ... ")
-            
-            print("Trying to remove temporary files ... ")
-            os.remove(input_name_csv)
-            os.remove(input_name_h5)
-            print("Successfully removed temporary files ...")
+            print("Successfully saved result image ... ")           
+
 
     print(" --> LIST OUTPUT IMAGES IN "+str(OUTPUT_PATH))
 
