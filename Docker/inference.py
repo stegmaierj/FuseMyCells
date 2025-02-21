@@ -75,6 +75,12 @@ def run():
             image_groups = ["data/raw_image", "data/surface_distance"]
             in_channels = 2
 
+            if study_number == 2:
+                image_groups = ["data/raw_image", "data/light_map"]
+            elif study_number == 3 and metadata['channel'] == 'membrane':
+                in_channels = 1
+                image_groups = ["data/raw_image"]
+
             input_path_tif = join(INPUT_PATH,input_file_name)
             input_name_h5 = join(str(TMP_PATH), input_file_name.replace(".tiff", ".h5").replace(".tif", ".h5"))
             input_name_csv = join(str(TMP_PATH), input_file_name.replace(".tiff", ".csv").replace(".tif", ".csv"))
