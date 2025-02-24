@@ -102,6 +102,37 @@ class ImageFusionUNet3D(pl.LightningModule):
         return loss
 
 
+    # loss based on the ssim between prediction and target
+    def ssim_loss(self, y_hat, y):
+
+        # get the losses
+        ssim = StructuralSimilarityIndexMeasure(data_range=1.0)
+        ssim.cuda()
+
+        loss_ssim = self.ssim_weight * (1.0 - ssim(y_hat, y))
+        loss_l1 = F.l1_loss(y_hat, y)
+
+        loss = loss_ssim + loss_l1
+
+        return loss, loss_l1, loss_ssim
+
+    # loss based on the ssim ratio between ground truth and input
+    # n_ssim = (prediction_ssim - reference_ssim) / (1 - reference_ssim)
+    def fmc_loss(self, x, y_hat, y):
+
+        # get the losses
+        ssim = StructuralSimilarityIndexMeasure(data_range=1.0)
+        ssim.cuda()
+
+        prediction_ssim = ssim(y_hat, y)
+        reference_ssim = ssim(x, y)
+
+        loss = (prediction_ssim - reference_ssim) / (1.0 - reference_ssim)
+
+        # return the negative variant of this loss to minimize it
+        return -loss
+
+
     def training_step(self, batch, batch_idx):
         
         # Get image ans mask of current batch
@@ -110,32 +141,16 @@ class ImageFusionUNet3D(pl.LightningModule):
         # generate images
         self.predictions = self.forward(self.last_imgs)
                         
-        # get the losses
-        ssim = StructuralSimilarityIndexMeasure(data_range=1.0)
-        ssim.cuda()
+        if not self.hparams.use_fmc_loss:
 
-        loss_ssim = self.ssim_weight * (1.0 - ssim(self.predictions, self.last_masks))
-        loss_l1 = F.l1_loss(self.predictions, self.last_masks)
+            loss, loss_l1, loss_ssim = self.ssim_loss(self.predictions, self.last_masks)
 
-        loss = loss_ssim + loss_l1
-
-        self.logger.experiment.add_scalar('ssim', loss_ssim, self.current_epoch)
-        self.logger.experiment.add_scalar('l1', loss_l1, self.current_epoch)
-        self.logger.experiment.add_scalar('loss', loss, self.current_epoch)
-
-        """
-        loss_bg = self.background_loss(self.predictions[:,0,...], self.last_masks[:,0,...])
-        loss_seed = self.seed_loss(self.predictions[:,1,...], self.last_masks[:,1,...])
-        loss_boundary = self.boundary_loss(self.predictions[:,2,...], self.last_masks[:,2,...])
-        
-        loss = self.hparams.background_weight * loss_bg + \
-               self.hparams.seed_weight * loss_seed + \
-               self.hparams.boundary_weight * loss_boundary
-        
-        self.logger.experiment.add_scalar('bg_loss', loss_bg, self.current_epoch)
-        self.logger.experiment.add_scalar('seed_loss', loss_seed, self.current_epoch) 
-        self.logger.experiment.add_scalar('boundary_loss', loss_boundary, self.current_epoch)
-        """
+            self.logger.experiment.add_scalar('ssim', loss_ssim, self.current_epoch)
+            self.logger.experiment.add_scalar('l1', loss_l1, self.current_epoch)
+            self.logger.experiment.add_scalar('loss', loss, self.current_epoch)
+        else:
+            loss = self.fmc_loss(self.last_imgs, self.predictions, self.last_masks)
+            self.logger.experiment.add_scalar('loss', loss, self.current_epoch)
         
         return loss
         
@@ -143,45 +158,55 @@ class ImageFusionUNet3D(pl.LightningModule):
         x, y = batch['image'], batch['mask']
         y_hat = self.forward(x)
 
-        ssim = StructuralSimilarityIndexMeasure(data_range=1.0)
-        ssim.cuda()
+        if not self.hparams.use_fmc_loss:
+            test_loss, test_loss_l1, test_loss_ssim = self.ssim_loss(y_hat, y)
+            return {'test_loss_ssim': test_loss_ssim, 'test_loss_l1': test_loss_l1, 'test_loss': test_loss}
+        else:
+            test_loss = self.fmc_loss(x, y_hat, y)
+            return {'test_loss': test_loss}
 
-        test_loss_ssim = self.ssim_weight * (1.0 - ssim(y_hat, y))
-        test_loss_l1 = F.l1_loss(y_hat, y)
-
-        test_loss = test_loss_ssim + test_loss_l1
-
-        return {'test_loss_ssim': test_loss_ssim, 'test_loss_l1': test_loss_l1, 'test_loss': test_loss}
 
     def test_end(self, outputs):
-        avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
-        avg_loss_ssim = torch.stack([x['test_loss_ssim'] for x in outputs]).mean()
-        avg_loss_l1 = torch.stack([x['test_loss_l1'] for x in outputs]).mean()
 
-        tensorboard_logs = {'test_loss': avg_loss, 'test_loss_l1': avg_loss_l1, 'test_loss_ssim': avg_loss_ssim}
-        return {'avg_test_loss': avg_loss, 'avg_test_loss_l1': avg_loss_l1, 'avg_test_loss_ssim': avg_loss_ssim, 'log': tensorboard_logs}
+        if not self.hparams.use_fmc_loss:
+            avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
+            avg_loss_ssim = torch.stack([x['test_loss_ssim'] for x in outputs]).mean()
+            avg_loss_l1 = torch.stack([x['test_loss_l1'] for x in outputs]).mean()
+
+            tensorboard_logs = {'test_loss': avg_loss, 'test_loss_l1': avg_loss_l1, 'test_loss_ssim': avg_loss_ssim}
+            return {'avg_test_loss': avg_loss, 'avg_test_loss_l1': avg_loss_l1, 'avg_test_loss_ssim': avg_loss_ssim, 'log': tensorboard_logs}
+
+        else:
+            avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
+
+            tensorboard_logs = {'test_loss': avg_loss}
+            return {'avg_test_loss': avg_loss, 'log': tensorboard_logs}
+
     
     def validation_step(self, batch, batch_idx):
         x, y = batch['image'], batch['mask']
         y_hat = self.forward(x)
 
-        ssim = StructuralSimilarityIndexMeasure(data_range=1.0)
-        ssim.cuda()
-
-        val_loss_ssim = self.ssim_weight * (1.0 - ssim(y_hat, y))
-        val_loss_l1 = F.l1_loss(y_hat, y)
-
-        val_loss = val_loss_ssim + val_loss_l1
-
-        return {'val_loss_ssim': val_loss_ssim, 'val_loss_l1': val_loss_l1, 'val_loss': val_loss}
+        if not self.hparams.use_fmc_loss:
+            val_loss, val_loss_l1, val_loss_ssim = self.ssim_loss(y_hat, y)
+            return {'val_loss_ssim': val_loss_ssim, 'val_loss_l1': val_loss_l1, 'val_loss': val_loss}
+        else:
+            val_loss = self.fmc_loss(x, y_hat, y)
+            return {'val_loss': val_loss}
 
     def validation_end(self, outputs):
-        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        avg_loss_ssim = torch.stack([x['val_loss_ssim'] for x in outputs]).mean()
-        avg_loss_l1 = torch.stack([x['val_loss_l1'] for x in outputs]).mean()
+        if not self.hparams.use_fmc_loss:
+            avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
+            avg_loss_ssim = torch.stack([x['val_loss_ssim'] for x in outputs]).mean()
+            avg_loss_l1 = torch.stack([x['val_loss_l1'] for x in outputs]).mean()
 
-        tensorboard_logs = {'val_loss': avg_loss, 'val_loss_l1': avg_loss_l1, 'val_loss_ssim': avg_loss_ssim}
-        return {'avg_val_loss': avg_loss, 'avg_val_loss_l1': avg_loss_l1, 'avg_val_loss_ssim': avg_loss_ssim, 'log': tensorboard_logs}
+            tensorboard_logs = {'val_loss': avg_loss, 'val_loss_l1': avg_loss_l1, 'val_loss_ssim': avg_loss_ssim}
+            return {'avg_val_loss': avg_loss, 'avg_val_loss_l1': avg_loss_l1, 'avg_val_loss_ssim': avg_loss_ssim, 'log': tensorboard_logs}
+        else:
+            avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
+            tensorboard_logs = {'val_loss': avg_loss}
+            return {'avg_val_loss': avg_loss, 'log': tensorboard_logs}
+
 
     def configure_optimizers(self):
         opt = torch.optim.RAdam(self.network.parameters(), lr=self.hparams.learning_rate)
@@ -281,5 +306,6 @@ class ImageFusionUNet3D(pl.LightningModule):
         parser.add_argument('--seed_weight', default=100, type=float)
         parser.add_argument('--boundary_weight', default=1, type=float)
         parser.add_argument('--ssim_weight', default=100, type=float)
+        parser.add_argument('--use_fmc_loss', dest='use_fmc_loss', action='store_true', default=False, help='Use FMC loss based on SSIM ratios')
         
         return parser

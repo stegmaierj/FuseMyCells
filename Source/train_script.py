@@ -56,6 +56,8 @@ def main(hparams):
         print('Saving 20 data samples for sanity checks...')
         model.train_dataloader().dataset.test(os.path.join(hparams.output_path, 'samples'), num_files=20)
 
+    print('use_fmc_loss is set to: %i' % hparams.use_fmc_loss)
+
     # ------------------------
     # 2 INIT TRAINER
     # ------------------------
