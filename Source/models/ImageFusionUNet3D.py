@@ -120,6 +120,9 @@ class ImageFusionUNet3D(pl.LightningModule):
     # n_ssim = (prediction_ssim - reference_ssim) / (1 - reference_ssim)
     def fmc_loss(self, x, y_hat, y):
 
+        if x.shape[1] > 1:
+            x = x[:,[0], ...]
+
         # get the losses
         ssim = StructuralSimilarityIndexMeasure(data_range=1.0)
         ssim.cuda()
