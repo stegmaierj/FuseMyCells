@@ -115,6 +115,16 @@ def run():
             else:
                 image_predict = image_input
 
+            # rescale intensity to the range of the input image (shouldn't be needed but just in case...)
+            input_min_intensity = np.min(image_input)
+            input_max_intensity = np.max(image_input)
+            output_min_intensity = np.min(image_predict)
+            output_max_intensity = np.max(image_predict)
+
+            image_predict = (image_predict - output_min_intensity) / (output_max_intensity - output_min_intensity)
+            image_predict = image_predict * (input_max_intensity - input_min_intensity) + input_min_intensity
+            image_predict = image_predict.astype(np.uint16)
+
             print("Trying to save result image ... ")
             save_image(location = join(OUTPUT_PATH, basename(input_file_name)),
                        array = image_predict,
