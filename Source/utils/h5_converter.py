@@ -301,10 +301,10 @@ def prepare_image_fmc(input_path, input_image, metadata, output_path=None, ident
         downsampling_factor_z = 5
         downsampling_factor_xy = 5
 
-    image_spacing = [float(metadata['physical_size_z']), float(metadata['physical_size_y']), float(metadata['physical_size_x'])]
-    image_spacing_small = [float(metadata['physical_size_z'])*downsampling_factor_z, \
-                           float(metadata['physical_size_y'])*downsampling_factor_xy, \
-                           float(metadata['physical_size_x'])*downsampling_factor_xy]
+    image_spacing = [float(metadata['PhysicalSizeZ']), float(metadata['PhysicalSizeY']), float(metadata['PhysicalSizeX'])]
+    image_spacing_small = [float(metadata['PhysicalSizeZ'])*downsampling_factor_z, \
+                           float(metadata['PhysicalSizeY'])*downsampling_factor_xy, \
+                           float(metadata['PhysicalSizeX'])*downsampling_factor_xy]
 
     # save the data
     head, tail = os.path.split(input_path)
@@ -328,7 +328,7 @@ def prepare_image_fmc(input_path, input_image, metadata, output_path=None, ident
             print("File %s will be reprocessed as H5 file seems corrupt ..." % (save_name))
 
     # load the image
-    input_image = io.imread(input_path)
+    #input_image = io.imread(input_path)
     input_image = input_image.astype(np.float32)
 
     # create downsampled version of the image
@@ -451,8 +451,8 @@ def prepare_image_fmc(input_path, input_image, metadata, output_path=None, ident
             edt_image = sitk.GetImageFromArray(1 - convex_image.astype(np.uint16))
             edt_image.SetSpacing(image_spacing_small)
 
-            edt_image = sitk.DanielssonDistanceMap(edt_image, useImageSpacing=True)
-            edt_image = sitk.GetArrayFromImage(edt_image).astype(np.uint16)
+            edt_image = sitk.SignedDanielssonDistanceMap(edt_image, useImageSpacing=True)
+            edt_image = sitk.GetArrayFromImage(edt_image).astype(np.float32)
 
             # rescale distance image
             edt_image = np.repeat(edt_image, downsampling_factor_z, axis=0)
@@ -465,9 +465,9 @@ def prepare_image_fmc(input_path, input_image, metadata, output_path=None, ident
 
         else:
             edt_image = distance_transform_edt(convex_image)
-            edt_image = zoom(edt_image.astype(np.uint16), (upsampling_factors[0], upsampling_factors[1], upsampling_factors[2]))
+            edt_image = zoom(edt_image.astype(np.float32), (upsampling_factors[0], upsampling_factors[1], upsampling_factors[2]))
         
-        save_imgs.append(edt_image.astype(np.uint16))
+        save_imgs.append(edt_image.astype(np.float32))
         save_groups.append('surface_distance')
 
         print_timestamp('Done extracting distance map image...')

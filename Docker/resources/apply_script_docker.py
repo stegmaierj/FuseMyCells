@@ -10,6 +10,7 @@ import os
 import numpy as np
 import torch
 import csv
+import h5py
 from skimage import io
 from argparse import ArgumentParser
 from torch.autograd import Variable
@@ -20,6 +21,19 @@ from resources.utils.utils import print_timestamp
 SEED = 1337
 torch.manual_seed(SEED)
 np.random.seed(SEED)
+
+def compute_feasible_image_shape(data_shape, num_downsampling_steps=4):
+
+    padded_shape = np.zeros_like(data_shape)
+    minimum_factor = 2 ** num_downsampling_steps
+
+    for i in range(0, len(padded_shape)):
+        padded_shape[i] = minimum_factor * (data_shape[i] // minimum_factor)
+        if padded_shape[i] < data_shape[i]:
+            padded_shape[i] += minimum_factor
+
+    return padded_shape
+
 
 
 def fmc_process_image(hparams, network):
@@ -58,7 +72,7 @@ def fmc_process_image(hparams, network):
 
     if hparams.gpus > 0:
         model = model.cuda()
-    
+
     # ------------------------
     # 2 INIT DATA TILER
     # ------------------------
@@ -85,6 +99,32 @@ def fmc_process_image(hparams, network):
         # Check if current file has already been processed
         # Initialize current file        
         tiler.set_data_idx(image_idx)
+
+        # option to predict entire image in one go
+        predict_full_image = False
+        if predict_full_image:
+
+            with h5py.File(tiler.data_list[image_idx][0], 'r') as f_handle:
+                image = f_handle[hparams.image_groups[0]]
+                data_shape = image.shape[:3]
+
+                padded_shape = compute_feasible_image_shape(data_shape, 4)
+
+                input_image = np.zeros((1,len(hparams.image_groups), padded_shape[0], padded_shape[1], padded_shape[2]))
+                input_image = input_image.astype(np.float32)
+
+                for group in range(0, len(hparams.image_groups)):
+                    input_image[:, group, :data_shape[0], :data_shape[1], :data_shape[2]] = f_handle[hparams.image_groups[group]]
+
+            input_image = torch.from_numpy(input_image)
+
+            model = model.cpu()
+
+            predicted_image = model(input_image)
+
+            predicted_image = predicted_image.cpu().data.numpy()
+            return predicted_img
+
         
         # Determine if the patch size exceeds the image size
         working_size = tuple(np.max(np.array(tiler.locations), axis=0) - np.min(np.array(tiler.locations), axis=0) + np.array(hparams.patch_size))
@@ -122,7 +162,7 @@ def fmc_process_image(hparams, network):
             pred_patch = model(data)
             pred_patch = pred_patch.cpu().data.numpy()
             pred_patch = np.squeeze(pred_patch)
-            pred_patch = np.clip(pred_patch, hparams.clip[0], hparams.clip[1])
+            #pred_patch = np.clip(pred_patch, hparams.clip[0], hparams.clip[1])
                         
             # Get the current slice position
             slicing = tuple(map(slice, (0,)+tuple(tiler.patch_start+tiler.global_crop_before), (hparams.out_channels,)+tuple(tiler.patch_end+tiler.global_crop_before)))

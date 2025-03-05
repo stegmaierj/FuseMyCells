@@ -573,6 +573,8 @@ class MeristemH5Tiler(Dataset):
             elif self.dist_handling == 'tanh':    
                 foreground = np.float16(data>0)
                 data = np.tanh(data/self.dist_scaling[0])*foreground + np.tanh(data/self.dist_scaling[1])*(1-foreground)
+            elif self.dist_handling == 'none':
+                return data
             
         elif 'seed' in group_name:                    
             if self.seed_handling == 'float':

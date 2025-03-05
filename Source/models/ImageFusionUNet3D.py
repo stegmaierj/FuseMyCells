@@ -133,7 +133,7 @@ class ImageFusionUNet3D(pl.LightningModule):
         loss = (prediction_ssim - reference_ssim) / (1.0 - reference_ssim)
 
         # return the negative variant of this loss to minimize it
-        return -loss
+        return -loss + F.l1_loss(y_hat, y)
 
 
     def training_step(self, batch, batch_idx):
@@ -299,7 +299,7 @@ class ImageFusionUNet3D(pl.LightningModule):
         parser.add_argument('--val_list', default=r'/work/scratch/stegmaier/Projects/2025/FuseMyCellsISBI_ImageFusion/Source/Source/data/Study1_val.csv', type=str)
         parser.add_argument('--image_groups', default=('data/raw_image', 'data/normalized_intensity', 'data/surface_distance', 'data/light_map'), type=str, nargs='+')
         parser.add_argument('--mask_groups', default=('data/raw_image',), type=str, nargs='+')
-        parser.add_argument('--dist_handling', default='bool_inv', type=str)
+        parser.add_argument('--dist_handling', default='none', type=str)
         
         # training params
         parser.add_argument('--samples_per_epoch', default=-1, type=int)

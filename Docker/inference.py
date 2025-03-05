@@ -59,7 +59,7 @@ def run():
             print(" --> Predict " + input_file_name)
             image_input, metadata = read_image(join(INPUT_PATH,input_file_name))
 
-            skip_processing = True
+            skip_processing = False
 
             if not skip_processing:
                 # determine which model to use
@@ -78,11 +78,11 @@ def run():
                 image_groups = ["data/raw_image", "data/surface_distance"]
                 in_channels = 2
 
-                if study_number == 2:
-                    image_groups = ["data/raw_image", "data/light_map"]
-                elif study_number == 3 and metadata['channel'] == 'membrane':
-                    in_channels = 1
-                    image_groups = ["data/raw_image"]
+                #if study_number == 2:
+                #    image_groups = ["data/raw_image", "data/light_map"]
+                #elif study_number == 3 and metadata['channel'] == 'membrane':
+                #    in_channels = 1
+                #    image_groups = ["data/raw_image"]
 
                 input_path_tif = join(INPUT_PATH,input_file_name)
                 input_name_h5 = join(str(TMP_PATH), input_file_name.replace(".tiff", ".h5").replace(".tif", ".h5"))
@@ -109,7 +109,7 @@ def run():
 
                 print("Trying to remove temporary files ... ")
                 os.remove(input_name_csv)
-                os.remove(input_name_h5)
+                #os.remove(input_name_h5)
                 print("Successfully removed temporary files ...")
                 
             else:
