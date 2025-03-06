@@ -182,6 +182,7 @@ def fmc_process_image(hparams, network):
         # Save the predicted image
         predicted_img = np.transpose(predicted_img, (1,2,3,0))
         predicted_img = predicted_img.astype(np.float32)
+        predicted_img = np.squeeze(predicted_img)
 
         return predicted_img
 

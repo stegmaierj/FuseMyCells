@@ -109,7 +109,7 @@ def run():
 
                 print("Trying to remove temporary files ... ")
                 os.remove(input_name_csv)
-                #os.remove(input_name_h5)
+                os.remove(input_name_h5)
                 print("Successfully removed temporary files ...")
                 
             else:
