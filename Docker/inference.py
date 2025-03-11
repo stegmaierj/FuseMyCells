@@ -67,6 +67,9 @@ def run():
                 model_suffix = "Nucleus" if metadata['channel'] == 'nucleus' else "Membrane"
                 if 'study' in metadata:
                     study_number = int(metadata['study'])
+                    
+                    if study_number > 5 or study_number < 1:
+                        study_number, model_suffix = fmc_guess_dataset(metadata)
                 else:
                     study_number, model_suffix = fmc_guess_dataset(metadata)
 
