@@ -88,7 +88,7 @@ def fmc_guess_dataset(metadata):
                 min_index = i
                 min_distance = size_distance
 
-        return min_index + 1, 'nucleus'
+        return min_index + 1, 'Nucleus'
 
     # membrane data sets are 1, 3
     else:
@@ -101,7 +101,7 @@ def fmc_guess_dataset(metadata):
                 min_index = i
                 min_distance = size_distance
 
-        return min_index + 1, 'membrane'
+        return min_index + 1, 'Membrane'
     
 
 def get_centroids(input_image, normalize=False):
