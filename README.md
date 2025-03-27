@@ -30,7 +30,11 @@ Study1_H5/image_25_membrane_angle.h5;Study1_H5/image_25_membrane_fused.h5
 ...
 ```
 
-Depending on the number of input channels that should be used during training, the input parameter `image_groups` needs to be adjusted accordingly. Valid options are `data/raw_image`, `data/surface_distance`, `data/light_map`. The number of input channels of the network also has to be adapted accordingly using the `in_channels` parameter. We tested two different loss functions:
+Depending on the number of input channels that should be used during training, the input parameter `image_groups` needs to be adjusted accordingly. Valid options are `data/raw_image`, `data/surface_distance`, `data/light_map`. The number of input channels of the network also has to be adapted accordingly using the `in_channels` parameter. An example of the surface distance image and the light map is shown in the figure below in the left and right panel, respectively:
+
+![Surface Distance (left) and Light Map (right)](AuxiliaryChannels.png "Title")
+
+We tested two different loss functions:
 
 1. SSIM + L1: This loss minimizes the sum of the negative SSIM and L1 distance of input and target image.
 2. The second loss directly implements the evaluation metric of the Fuse My Cells Challenge ([N_SSIM](https://fusemycells.grand-challenge.org/evaluation-metrics/)) and is also regularized using the L1 distance of input and target image.
